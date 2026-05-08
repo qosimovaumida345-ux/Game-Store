@@ -153,37 +153,45 @@
                             <p className="text-white/60 font-body text-sm uppercase tracking-widest mt-2">Mobile Interface</p>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="liquid-glass-strong rounded-3xl p-8 flex flex-col gap-6">
-                            <div>
-                                <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Connection Code</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-center font-heading italic text-3xl tracking-widest focus:outline-none focus:border-white/50"
-                                    value={code}
-                                    onChange={e => setCode(e.target.value.toUpperCase())}
-                                    placeholder="000000"
-                                    maxLength={6}
-                                    required
-                                />
+                        {initialCode ? (
+                            <div className="liquid-glass-strong rounded-3xl p-8 flex flex-col items-center justify-center gap-6 min-h-[300px]">
+                                <div className="w-16 h-16 rounded-full border-4 border-t-[#00ffcc] border-white/10 animate-spin mb-4"></div>
+                                <h3 className="text-[#00ffcc] font-heading text-2xl animate-pulse">Auto-Connecting...</h3>
+                                <p className="text-white/50 text-sm font-body">QR Code Scanned Successfully</p>
                             </div>
-                            <div>
-                                <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Callsign (Name)</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white font-body text-lg focus:outline-none focus:border-white/50"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    placeholder="Enter your name"
-                                    required
-                                />
-                            </div>
-                            <button 
-                                type="submit"
-                                className="w-full bg-white text-black font-body font-bold text-lg rounded-xl py-3 mt-4 hover:bg-white/90 active:scale-95 transition-all"
-                            >
-                                CONNECT <span className="ml-2">→</span>
-                            </button>
-                        </form>
+                        ) : (
+                            <form onSubmit={handleSubmit} className="liquid-glass-strong rounded-3xl p-8 flex flex-col gap-6">
+                                <div>
+                                    <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Connection Code</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-center font-heading italic text-3xl tracking-widest focus:outline-none focus:border-white/50"
+                                        value={code}
+                                        onChange={e => setCode(e.target.value.toUpperCase())}
+                                        placeholder="000000"
+                                        maxLength={6}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Callsign (Name)</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white font-body text-lg focus:outline-none focus:border-white/50"
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                        placeholder="Enter your name"
+                                        required
+                                    />
+                                </div>
+                                <button 
+                                    type="submit"
+                                    className="w-full bg-white text-black font-body font-bold text-lg rounded-xl py-3 mt-4 hover:bg-white/90 active:scale-95 transition-all"
+                                >
+                                    CONNECT <span className="ml-2">→</span>
+                                </button>
+                            </form>
+                        )}
                     </motion.div>
                 </div>
             );
@@ -281,7 +289,17 @@
                 <div className="relative min-h-screen flex flex-col bg-black overflow-hidden" 
                      onTouchMove={e => e.preventDefault()}> {/* Prevent scrolling */}
                     
-                    <div className="flex-1 flex items-center justify-between px-12 pb-8">
+                    {/* External Game Info Banner */}
+                    <div className="absolute top-4 left-0 w-full text-center px-4 z-50">
+                        <div className="inline-block bg-[#00ffcc]/10 border border-[#00ffcc]/30 rounded-full px-4 py-2 backdrop-blur-sm">
+                            <p className="text-[#00ffcc] text-[10px] font-body uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-[#00ffcc] animate-pulse"></span>
+                                MEGA PORTAL: external games may require PC keyboard
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex items-center justify-between px-12 pb-8 pt-16">
                         {/* Joystick */}
                         <div 
                             ref={joystickRef}
@@ -327,11 +345,31 @@
             const urlParams = new URLSearchParams(window.location.search);
             const initialCode = urlParams.get('code') || '';
 
+            // Generate cool random names
+            const generateName = () => {
+                const prefix = ['Vortex', 'Cyber', 'Ghost', 'Neon', 'Apex', 'Nova', 'Pulse', 'Omen', 'Zero'];
+                const suffix = ['Runner', 'Striker', 'Hunter', 'Ghost', 'Wraith', 'Specter', 'Blade', 'Void'];
+                return `${prefix[Math.floor(Math.random()*prefix.length)]}_${suffix[Math.floor(Math.random()*suffix.length)]}${Math.floor(Math.random()*999)}`;
+            };
+
             useEffect(() => {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${wsProtocol}//${window.location.host}/controller`;
                 const ws = new WebSocket(wsUrl);
                 
+                ws.onopen = () => {
+                    // AUTO CONNECT IF QR CODE FOUND
+                    if (initialCode && gameState === 'login') {
+                        const name = generateName();
+                        setPlayerName(name);
+                        ws.send(JSON.stringify({
+                            type: 'join-room',
+                            roomCode: initialCode,
+                            playerName: name
+                        }));
+                    }
+                };
+
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
                     
@@ -351,7 +389,7 @@
                 return () => {
                     if(ws.readyState === WebSocket.OPEN) ws.close();
                 };
-            }, []);
+            }, [initialCode]);
 
             const handleJoin = (code, name) => {
                 setPlayerName(name);
@@ -378,7 +416,17 @@
 
             return (
                 <div className="min-h-screen text-white font-body selection:bg-white/20">
-                    {gameState === 'login' && <JoinScreen onJoin={handleJoin} urlCode={initialCode} />}
+                    {gameState === 'login' && (
+                        initialCode ? (
+                            <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+                                <div className="w-20 h-20 border-4 border-[#00ffcc] border-t-transparent rounded-full animate-spin mb-8"></div>
+                                <h1 className="font-heading italic text-4xl text-[#00ffcc] mb-2 animate-pulse">CONNECTING...</h1>
+                                <p className="text-white/60 uppercase tracking-widest text-sm">Syncing with Screen {initialCode}</p>
+                            </div>
+                        ) : (
+                            <JoinScreen onJoin={handleJoin} urlCode={initialCode} />
+                        )
+                    )}
                     {gameState === 'lobby' && <LobbyScreen name={playerName} />}
                     {gameState === 'playing' && <GamepadScreen onInput={handleInput} />}
                 </div>

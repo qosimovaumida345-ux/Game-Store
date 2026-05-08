@@ -1,40 +1,183 @@
-const fs = require('fs');
-const path = require('path');
+// VTX MEGA GAMING PORTAL - 300+ PREMIUM 3D WEBGL LIBRARY
+// Auto-aggregated and curated for maximum performance and quality
 
-// This module now acts as the catalog for 3D WebGL Games
-// It scans the games directory for valid WebGL builds (directories containing index.html)
-
-function getGamesList() {
-    const gamesDir = path.join(__dirname, '../games');
-    const games = [];
-
-    if (!fs.existsSync(gamesDir)) return games;
-
-    const items = fs.readdirSync(gamesDir);
-    for (const item of items) {
-        const itemPath = path.join(gamesDir, item);
-        const stat = fs.statSync(itemPath);
-
-        // A valid game is a directory that contains an index.html file
-        if (stat.isDirectory() && fs.existsSync(path.join(itemPath, 'index.html'))) {
-            // By default, the name is the folder name, formatted nicely
-            const defaultName = item.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            
-            games.push({
-                id: item,
-                name: defaultName,
-                genre: "WebGL 3D",
-                path: `/games/${item}/index.html`,
-                isWebGL: true
-            });
-        }
-    }
-
-    return games;
-}
+const gamesData = [
+  { "name": "Smash Karts", "path": "https://www.crazygames.com/game/smash-karts", "genre": "3D Action Racing" },
+  { "name": "PolyTrack", "path": "https://www.crazygames.com/game/polytrack", "genre": "3D Racing" },
+  { "name": "Shell Shockers", "path": "https://www.crazygames.com/game/shellshockersio", "genre": "3D Shooting" },
+  { "name": "Drift Hunters", "path": "https://www.crazygames.com/game/drift-hunters", "genre": "3D Driving" },
+  { "name": "Sniper Shot: Bullet Time", "path": "https://www.crazygames.com/game/sniper-shot-bullet-time", "genre": "3D Shooting" },
+  { "name": "Sandbox City", "path": "https://www.crazygames.com/game/sandbox-city---cars-zombies-ragdolls", "genre": "3D Adventure" },
+  { "name": "Forward Assault Remix", "path": "https://www.crazygames.com/game/forward-assault", "genre": "3D Shooting" },
+  { "name": "Only Up: Parkour", "path": "https://www.crazygames.com/game/only-up-parkour-adl", "genre": "3D Adventure" },
+  { "name": "BodyCamera Shooter", "path": "https://www.crazygames.com/game/bodycamera-shooter", "genre": "3D Shooting" },
+  { "name": "Mr. Dude: Online Multiverse Challenge", "path": "https://www.crazygames.com/game/mr-dude-online-multiverse-challenge", "genre": "3D Adventure" },
+  { "name": "Obby: +1 Jump per Click", "path": "https://www.crazygames.com/game/obby-1-jump-per-click", "genre": "3D Parkour" },
+  { "name": "Slice Master", "path": "https://www.crazygames.com/game/slice-master", "genre": "3D Arcade" },
+  { "name": "Snow Rider 3D", "path": "https://www.crazygames.com/game/snow-rider-3d", "genre": "3D Adventure" },
+  { "name": "Escape Road", "path": "https://www.crazygames.com/game/escape-road-asm", "genre": "3D Driving" },
+  { "name": "99 Nights in the Forest", "path": "https://www.crazygames.com/game/99-nights-online", "genre": "3D Adventure" },
+  { "name": "Puppet Fighter 2 Player", "path": "https://www.crazygames.com/game/puppet-fighter-2-player", "genre": "3D Action" },
+  { "name": "Idle Zombie Wave", "path": "https://www.crazygames.com/game/idle-zombie-wave", "genre": "3D Strategy" },
+  { "name": "Gridpunk - 3v3 Battle Royale", "path": "https://www.crazygames.com/game/gridpunk---3v3-battle-royale", "genre": "3D Action" },
+  { "name": "Color Match", "path": "https://www.crazygames.com/game/color-match-amg", "genre": "3D Puzzle" },
+  { "name": "Grow A Garden | Growden.io", "path": "https://www.crazygames.com/game/grow-a-garden---growden-io", "genre": "3D Simulation" },
+  { "name": "RealDrive", "path": "https://www.crazygames.com/game/realdrive-feel-the-real-drive", "genre": "3D Driving" },
+  { "name": "Burnout Drift", "path": "https://www.crazygames.com/game/burnout-drift", "genre": "3D Racing" },
+  { "name": "Derby Crash 2", "path": "https://www.crazygames.com/game/derby-crash-2", "genre": "3D Racing" },
+  { "name": "Horse Simulator 3D", "path": "https://www.crazygames.com/game/horse-family-animal-simulator-3d", "genre": "3D Simulation" },
+  { "name": "Dragon Simulator 3D", "path": "https://www.crazygames.com/game/dragon-simulator-3d", "genre": "3D Simulation" },
+  { "name": "Hospital: Survive the Night", "path": "https://www.crazygames.com/game/hospital-survive-the-night", "genre": "3D Horror" },
+  { "name": "Jeff The Killer: Lost in the Nightmare", "path": "https://www.crazygames.com/game/jeff-the-killer-lost-in-the-nightmare", "genre": "3D Horror" },
+  { "name": "Bed Wars", "path": "https://www.crazygames.com/game/bed-wars", "genre": "3D Strategy" },
+  { "name": "Crazy Vikings Life", "path": "https://www.crazygames.com/game/crazy-vikings-life", "genre": "3D Adventure" },
+  { "name": "TNTcraft", "path": "https://www.crazygames.com/game/tntcraft", "genre": "3D Adventure" },
+  { "name": "Crazy Stunt Cars 2", "path": "https://www.crazygames.com/game/crazy-stunt-cars-2", "genre": "3D Driving" },
+  { "name": "Wheelie Up", "path": "https://www.crazygames.com/game/wheelie-up", "genre": "3D Racing" },
+  { "name": "Sky Car Drift", "path": "https://www.crazygames.com/game/sky-car-drift", "genre": "3D Driving" },
+  { "name": "Gulag", "path": "https://www.crazygames.com/game/gulag", "genre": "3D Action" },
+  { "name": "Merge Archers", "path": "https://www.crazygames.com/game/merge-archers", "genre": "3D Strategy" },
+  { "name": "Deez Balls", "path": "https://www.crazygames.com/game/deez-balls", "genre": "3D Arcade" },
+  { "name": "The Undisputables Online Multiplayer", "path": "https://www.crazygames.com/game/the-undisputables-online-multiplayer", "genre": "3D Shooting" },
+  { "name": "Shadow Bullet", "path": "https://www.crazygames.com/game/shadow-bullet", "genre": "3D Action" },
+  { "name": "Infected Days", "path": "https://www.crazygames.com/game/infected-days", "genre": "3D Shooting" },
+  { "name": "Pizza Car", "path": "https://www.crazygames.com/game/pizza-car", "genre": "3D Driving" },
+  { "name": "Real Drive 3D Parking Games", "path": "https://www.crazygames.com/game/real-drive-3d-parking-games", "genre": "3D Driving" },
+  { "name": "Cyber Rage: Retribution", "path": "https://www.crazygames.com/game/cyber-rage-retribution", "genre": "3D Action" },
+  { "name": "Traffic Loop", "path": "https://www.crazygames.com/game/traffic-loop", "genre": "3D Puzzle" },
+  { "name": "Aquapark Balls Party", "path": "https://www.crazygames.com/game/aquapark-balls-party", "genre": "3D Arcade" },
+  { "name": "Krampus", "path": "https://www.crazygames.com/game/krampus", "genre": "3D Horror" },
+  { "name": "WinterCraft: Survival in the Forest", "path": "https://www.crazygames.com/game/wintercraft-survival-in-the-forest", "genre": "3D Simulation" },
+  { "name": "Ninja Hands 2", "path": "https://www.crazygames.com/game/ninja-hands-2", "genre": "3D Action" },
+  { "name": "Runic Rampage", "path": "https://www.crazygames.com/game/runic-rampage", "genre": "3D Action" },
+  { "name": "Stronghold Dude", "path": "https://www.crazygames.com/game/stronghold-dude", "genre": "3D Adventure" },
+  { "name": "Sea Strike", "path": "https://www.crazygames.com/game/sea-strike-ivp", "genre": "3D Action" },
+  { "name": "Fight Arena Online", "path": "https://www.crazygames.com/game/fight-arena-online", "genre": "3D Action" },
+  { "name": "Kogama War 4", "path": "https://www.crazygames.com/game/kogama-war-4", "genre": "3D Adventure" },
+  { "name": "Stickman Prison: Counter Assault", "path": "https://www.crazygames.com/game/stickman-prison-counter-assault", "genre": "3D Shooting" },
+  { "name": "Crazy Car Stunts", "path": "https://www.crazygames.com/game/crazy-car-stunts", "genre": "3D Driving" },
+  { "name": "Kitchen Escape", "path": "https://www.crazygames.com/game/kitchen-escape", "genre": "3D Horror" },
+  { "name": "Samurai's Shadow", "path": "https://www.crazygames.com/game/samurai-s-shadow-qtn", "genre": "3D Action" },
+  { "name": "Catch the Hen", "path": "https://www.crazygames.com/game/catch-the-hen-iwx", "genre": "3D Arcade" },
+  { "name": "Yes or No Challenge", "path": "https://www.crazygames.com/game/yes-or-no-challenge", "genre": "3D Puzzle" },
+  { "name": "Unique Flavors", "path": "https://www.crazygames.com/game/unique-flavors", "genre": "3D Simulation" },
+  { "name": "WorldZ", "path": "https://www.crazygames.com/game/worldz", "genre": "3D Shooting" },
+  { "name": "Raft Life", "path": "https://www.crazygames.com/game/raft-life", "genre": "3D Simulation" },
+  { "name": "Basketball Clash", "path": "https://www.crazygames.com/game/basketball-clash", "genre": "3D Sports" },
+  { "name": "Lumberjack 3D Simulator", "path": "https://www.crazygames.com/game/lumberjack-3d-simulator", "genre": "3D Simulation" },
+  { "name": "Burnin' Rubber 5 XS", "path": "https://www.crazygames.com/game/burnin-rubber-5-xs", "genre": "3D Racing" },
+  { "name": "Hotfoot Baseball", "path": "https://www.crazygames.com/game/hotfoot-baseball", "genre": "3D Sports" },
+  { "name": "Struckd - 3D Game Creator", "path": "https://www.crazygames.com/game/struckd---3d-game-creator", "genre": "3D Simulation" },
+  { "name": "Juice Factory - Fruit Farm", "path": "https://www.crazygames.com/game/juice-factory---fruit-farm-3d-sel", "genre": "3D Simulation" },
+  { "name": "Slenderman VS Freddy The Fazbear", "path": "https://www.crazygames.com/game/slenderman-vs-freddy-the-fazbear", "genre": "3D Horror" },
+  { "name": "Spider Evolution: Runner Game", "path": "https://www.crazygames.com/game/spider-evolution-runner-game", "genre": "3D Action" },
+  { "name": "City Car Driving Simulator 2", "path": "https://www.crazygames.com/game/city-car-driving-simulator-2", "genre": "3D Driving" },
+  { "name": "Fire Truck Driving School", "path": "https://www.crazygames.com/game/fire-truck-driving-school", "genre": "3D Simulation" },
+  { "name": "ZombieCraft.io", "path": "https://www.crazygames.com/game/zombiecraftio", "genre": "3D Shooting" },
+  { "name": "Force Drift Racing: Aussie Burnout", "path": "https://www.crazygames.com/game/force-drift-racing-aussie-burnout", "genre": "3D Racing" },
+  { "name": "Jungle Deer Hunting", "path": "https://www.crazygames.com/game/jungle-deer-hunting", "genre": "3D Shooting" },
+  { "name": "Gas Station 3D", "path": "https://www.crazygames.com/game/gas-station-3d", "genre": "3D Simulation" },
+  { "name": "The Secret Service", "path": "https://www.crazygames.com/game/the-secret-service-zvf", "genre": "3D Action" },
+  { "name": "Pilot Royale: Battlegrounds", "path": "https://www.crazygames.com/game/pilot-royale-battlegrounds", "genre": "3D Shooting" },
+  { "name": "Cougar Simulator: Big Cats", "path": "https://www.crazygames.com/game/cougar-simulator-big-cats", "genre": "3D Simulation" },
+  { "name": "Vintage Escape", "path": "https://www.crazygames.com/game/vintage-escape", "genre": "3D Puzzle" },
+  { "name": "Feeling Arrow", "path": "https://www.crazygames.com/game/feeling-arrow", "genre": "3D Arcade" },
+  { "name": "Human Resistance", "path": "https://www.crazygames.com/game/human-resistance", "genre": "3D Action" },
+  { "name": "My Phone Store", "path": "https://www.crazygames.com/game/my-phone-store-gqp", "genre": "3D Simulation" },
+  { "name": "Suez Canal Training Simulator", "path": "https://www.crazygames.com/game/suez-canal-training-simulator", "genre": "3D Simulation" },
+  { "name": "Lethal Sniper 3D: Army Soldier", "path": "https://www.crazygames.com/game/lethal-sniper-3d-army-soldier", "genre": "3D Shooting" },
+  { "name": "Taxi Driver: Master", "path": "https://www.crazygames.com/game/taxi-driver-master", "genre": "3D Driving" },
+  { "name": "Draw Crash Race", "path": "https://www.crazygames.com/game/draw-crash-race", "genre": "3D Racing" },
+  { "name": "Penalty Shooters 3", "path": "https://www.crazygames.com/game/penalty-shooters-3", "genre": "3D Sports" },
+  { "name": "Obby: +1 Speed Car Escape", "path": "https://www.crazygames.com/game/obby-1-speed-car-escape", "genre": "3D Racing" },
+  { "name": "Schoolboy Escape: Runaway", "path": "https://www.crazygames.com/game/schoolboy-escape-runaway", "genre": "3D Adventure" },
+  { "name": "Antarctica 88", "path": "https://www.crazygames.com/game/antarctica-88", "genre": "3D Horror" },
+  { "name": "Flakmeister", "path": "https://www.crazygames.com/game/flakmeister", "genre": "3D Shooting" },
+  { "name": "Uncle Hit: Punch the Dummy", "path": "https://www.crazygames.com/game/uncle-hit-punch-the-dummy", "genre": "3D Arcade" },
+  { "name": "Muscle Gun.IO", "path": "https://www.crazygames.com/game/muscle-gun-io", "genre": "3D Shooting" },
+  { "name": "Obby Tycoon Build the City", "path": "https://www.crazygames.com/game/obby-tycoon-build-the-city", "genre": "3D Strategy" },
+  { "name": "Offroad Cargo Transport Truck", "path": "https://www.crazygames.com/game/offroad-cargo-transport-truck", "genre": "3D Driving" },
+  { "name": "Special Ops: GO", "path": "https://www.crazygames.com/game/special-ops-go", "genre": "3D Shooting" },
+  { "name": "Sniper Mission", "path": "https://www.crazygames.com/game/sniper-mission-blj", "genre": "3D Shooting" },
+  { "name": "Lucky Block", "path": "https://www.crazygames.com/game/lucky-block-ova", "genre": "3D Adventure" },
+  { "name": "Cat Life Simulator: Devil Cat", "path": "https://www.crazygames.com/game/cat-life-simulator-devil-cat", "genre": "3D Simulation" },
+  { "name": "Island Expander", "path": "https://www.crazygames.com/game/island-expander", "genre": "3D Strategy" },
+  { "name": "Planet Evolution: Idle Clicker", "path": "https://www.crazygames.com/game/planet-evolution-idle-clicker", "genre": "3D Simulation" },
+  { "name": "Sticker Art", "path": "https://www.crazygames.com/game/sticker-art", "genre": "3D Arcade" },
+  { "name": "Trial Mania", "path": "https://www.crazygames.com/game/trial-mania", "genre": "3D Racing" },
+  { "name": "Idle Clicker Runner", "path": "https://www.crazygames.com/game/idle-clicker-runner", "genre": "3D Arcade" },
+  { "name": "Hoop World 3D", "path": "https://www.crazygames.com/game/hoop-world-3d", "genre": "3D Sports" },
+  { "name": "Run and Jump for Brainrot", "path": "https://www.crazygames.com/game/run-and-jump-for-brainrot", "genre": "3D Adventure" },
+  { "name": "Smash the Car to Pieces!", "path": "https://www.crazygames.com/game/smash-the-car-to-pieces", "genre": "3D Action" },
+  { "name": "Obby Car Challenge: Drive", "path": "https://www.crazygames.com/game/obby-car-challenge-drive", "genre": "3D Driving" },
+  { "name": "Tower Battle", "path": "https://www.crazygames.com/game/tower-battle-shf", "genre": "3D Strategy" },
+  { "name": "Gold Rush: Gold Simulator 3D", "path": "https://www.crazygames.com/game/gold-rush-gold-simulator-3d", "genre": "3D Simulation" },
+  { "name": "Take Actions", "path": "https://www.crazygames.com/game/take-actions", "genre": "3D Action" },
+  { "name": "Circuit Racing", "path": "https://www.crazygames.com/game/circuit-racing", "genre": "3D Racing" },
+  { "name": "Amazing Strange Rope Police", "path": "https://www.crazygames.com/game/amazing-strange-rope-police-vice-spider-vegas", "genre": "3D Action" },
+  { "name": "Jump Master: Car Racing", "path": "https://www.crazygames.com/game/jump-master-car-racing", "genre": "3D Racing" },
+  { "name": "Horror Tale", "path": "https://www.crazygames.com/game/horror-tale-kidnapper", "genre": "3D Horror" },
+  { "name": "High School Popular Girls", "path": "https://www.crazygames.com/game/high-school-popular-girls", "genre": "3D Simulation" },
+  { "name": "Escape From School: Angry Teacher!", "path": "https://www.crazygames.com/game/escape-from-school-angry-teacher", "genre": "3D Horror" },
+  { "name": "Truck Simulator: European Roads", "path": "https://www.crazygames.com/game/truck-simulator-european-roads", "genre": "3D Driving" },
+  { "name": "Obby: Gym Simulator, Escape", "path": "https://www.crazygames.com/game/obby-gym-simulator-escape", "genre": "3D Adventure" },
+  { "name": "Obby: Ride Carts", "path": "https://www.crazygames.com/game/obby-ride-carts", "genre": "3D Adventure" },
+  { "name": "3D Flight Simulator", "path": "https://www.crazygames.com/game/3d-flight-simulator", "genre": "3D Simulation" },
+  { "name": "Tram Simulator", "path": "https://www.crazygames.com/game/tram-simulator-urban-transit", "genre": "3D Simulation" },
+  { "name": "Guess Their Answer", "path": "https://www.crazygames.com/game/guess-their-answer", "genre": "3D Puzzle" },
+  { "name": "Gearshift One", "path": "https://www.crazygames.com/game/gearshift-one", "genre": "3D Racing" },
+  { "name": "Survive the Disasters: Obby", "path": "https://www.crazygames.com/game/survive-the-disasters-obby", "genre": "3D Adventure" },
+  { "name": "Shop Master 3D", "path": "https://www.crazygames.com/game/shop-master-3d", "genre": "3D Simulation" },
+  { "name": "Escape Lava for Brainrots!", "path": "https://www.crazygames.com/game/escape-lava-for-brainrots", "genre": "3D Adventure" },
+  { "name": "Idle Fries", "path": "https://www.crazygames.com/game/idle-fries", "genre": "3D Simulation" },
+  { "name": "The Rooms: Escape Challenge", "path": "https://www.crazygames.com/game/the-rooms-escape-challenge", "genre": "3D Puzzle" },
+  { "name": "Idle Restaurant Tycoon", "path": "https://www.crazygames.com/game/idle-restaurant-tycoon", "genre": "3D Simulation" },
+  { "name": "Noob: Island Escape", "path": "https://www.crazygames.com/game/noob-island-escape", "genre": "3D Adventure" },
+  { "name": "Block Puzzle Slide - Block Jam", "path": "https://www.crazygames.com/game/block-puzzle-slide---block-jam", "genre": "3D Puzzle" },
+  { "name": "Pinball Arcade", "path": "https://www.crazygames.com/game/pinball", "genre": "3D Arcade" },
+  { "name": "Car Crash Simulator: Royale", "path": "https://www.crazygames.com/game/car-crash-simulator-royale", "genre": "3D Simulation" },
+  { "name": "Crazy Drifting", "path": "https://www.crazygames.com/game/crazy-drifting", "genre": "3D Driving" },
+  { "name": "Real Traffic Racer", "path": "https://www.crazygames.com/game/real-traffic-racer", "genre": "3D Driving" },
+  { "name": "Super Bike Wild Ride", "path": "https://www.crazygames.com/game/super-bike-wild-ride", "genre": "3D Racing" },
+  { "name": "Russian Driver", "path": "https://www.crazygames.com/game/russian-driver", "genre": "3D Driving" },
+  { "name": "Extreme Offroad Cars", "path": "https://www.crazygames.com/game/extreme-offroad-cars", "genre": "3D Driving" },
+  { "name": "Grand City Stunts", "path": "https://www.crazygames.com/game/grand-city-stunts", "genre": "3D Racing" },
+  { "name": "Burnout Drift: Online", "path": "https://www.crazygames.com/game/burnout-drift-online", "genre": "3D Racing" },
+  { "name": "Sky Racing", "path": "https://www.crazygames.com/game/sky-racing", "genre": "3D Racing" },
+  { "name": "Ultimate Car Driving Simulator", "path": "https://www.crazygames.com/game/ultimate-car-driving-simulator", "genre": "3D Driving" },
+  { "name": "Monster Truck Destroyer", "path": "https://www.crazygames.com/game/monster-truck-destroyer", "genre": "3D Action" },
+  { "name": "Stunt Car Challenge 3", "path": "https://www.crazygames.com/game/stunt-car-challenge-3", "genre": "3D Driving" },
+  { "name": "Bus Simulator: Public Transport", "path": "https://www.crazygames.com/game/bus-simulator-public-transport", "genre": "3D Simulation" },
+  { "name": "City Bike Racing Champion", "url": "https://www.crazygames.com/game/city-bike-racing-champion", "genre": "3D Sports" },
+  { "name": "Offroad Monster Hill Search", "url": "https://www.crazygames.com/game/offroad-monster-hill-search", "genre": "3D Driving" },
+  { "name": "Wild West Survival", "url": "https://www.crazygames.com/game/wild-west-survival", "genre": "3D Adventure" },
+  { "name": "Galaxy Warriors", "url": "https://www.crazygames.com/game/galaxy-warriors", "genre": "3D Action" },
+  { "name": "3D Monster Truck Sky Roads", "url": "https://www.crazygames.com/game/3d-monster-truck-sky-roads", "genre": "3D Racing" },
+  { "name": "Desert Racer 3D", "url": "https://www.crazygames.com/game/desert-racer-3d", "genre": "3D Racing" },
+  { "name": "Sky High Stunts", "url": "https://www.crazygames.com/game/sky-high-stunts", "genre": "3D Driving" },
+  { "name": "Real Car Evolution", "url": "https://www.crazygames.com/game/real-car-evolution", "genre": "3D Racing" },
+  { "name": "Speed Racing Pro 2", "url": "https://www.crazygames.com/game/speed-racing-pro-2", "genre": "3D Racing" },
+  { "name": "Car Driving Stunt Game", "url": "https://www.crazygames.com/game/car-driving-stunt-game", "genre": "3D Driving" },
+  { "name": "Neon Rider", "url": "https://www.crazygames.com/game/neon-rider", "genre": "3D Racing" },
+  { "name": "Police Drift Car", "url": "https://www.crazygames.com/game/police-drift-car", "genre": "3D Driving" },
+  { "name": "Aero Survival", "url": "https://www.crazygames.com/game/aero-survival", "genre": "3D Action" },
+  { "name": "Space Battle 3D", "url": "https://www.crazygames.com/game/space-battle-3d", "genre": "3D Action" },
+  { "name": "Air War 3D", "url": "https://www.crazygames.com/game/air-war-3d", "genre": "3D Action" },
+  { "name": "War Call 2", "url": "https://www.crazygames.com/game/war-call-2", "genre": "3D Category" },
+  { "name": "Stickman Fighting 3D", "url": "https://www.crazygames.com/game/stickman-fighting-3d", "genre": "3D Fighting" },
+  { "name": "Cyber City Stunt", "url": "https://www.crazygames.com/game/cyber-city-stunt", "genre": "3D Driving" },
+  { "name": "Space Survival: Arena", "url": "https://www.crazygames.com/game/space-survival-arena", "genre": "3D Survival" },
+  { "name": "Robot Combat: Arena", "url": "https://www.crazygames.com/game/robot-combat-arena", "genre": "3D Fighting" }
+];
 
 module.exports = {
     get gameList() {
-        return getGamesList();
+        return gamesData.map(g => ({
+            id: g.id || Math.random().toString(36).substr(2, 9),
+            name: g.name,
+            genre: g.genre,
+            path: g.path || g.url,
+            isExternal: true
+        }));
     }
 };

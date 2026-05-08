@@ -389,23 +389,26 @@
                                     animate={{ opacity: 1, y: 0 }}
                                     className="mt-12"
                                 >
-                                    <p className="text-sm font-body text-white/80 mb-6 uppercase tracking-wider">// AVAILABLE WEBGL GAMES ({availableGames.length})</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[40vh] overflow-y-auto pr-2" style={{scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent'}}>
+                                    <p className="text-sm font-body text-white/80 mb-6 uppercase tracking-wider">// MEGA GAMING PORTAL ({availableGames.length} 3D GAMES)</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2" style={{scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent'}}>
                                         {availableGames.length === 0 && (
-                                            <div className="col-span-1 md:col-span-2 text-white/50 italic text-sm text-center py-4">No Auto-Built WebGL Games found yet.</div>
+                                            <div className="col-span-full text-white/50 italic text-sm text-center py-4">No games loaded. Fetching from aggregator...</div>
                                         )}
                                         {availableGames.map((game, i) => (
                                             <div 
                                                 key={i}
                                                 onClick={() => onStartGame(game.path)}
-                                                className="liquid-glass rounded-xl p-6 cursor-pointer hover:bg-white/10 transition-colors group"
+                                                className="liquid-glass rounded-xl p-6 cursor-pointer hover:bg-white/10 transition-colors group relative overflow-hidden"
                                             >
-                                                <h3 className="font-heading italic text-white text-3xl mb-2 group-hover:text-[#00ffcc] transition-colors">{game.name}</h3>
-                                                <p className="text-white/60 text-sm font-body uppercase tracking-wider">{game.genre}</p>
+                                                {/* Futuristic glow effect */}
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00ffcc] to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                
+                                                <h3 className="font-heading italic text-white text-2xl md:text-3xl mb-2 group-hover:text-[#00ffcc] transition-colors">{game.name}</h3>
+                                                <p className="text-[#00ffcc]/60 text-xs font-body font-bold uppercase tracking-wider bg-[#00ffcc]/10 inline-block px-2 py-1 rounded-md">{game.genre}</p>
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-white/40 text-xs italic mt-4 text-center">Clicking any game will trigger Unity VM Loader animation.</p>
+                                    <p className="text-white/40 text-xs italic mt-6 text-center">Selecting a game will mount the 3D Iframe from Official Servers.</p>
                                 </motion.div>
                             )}
                         </div>
@@ -429,10 +432,10 @@
                 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    console.log('WS Data:', data);
+                    // console.log('WS Data:', data); // Silenced console spam
                     
                     if (data.type === 'room-created') {
-                        setRoomId(data.roomId);
+                        setRoomId(data.roomCode); // FIXED: The server sends roomCode, not roomId
                         window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
                     }
                     else if (data.type === 'player-joined') {
@@ -497,13 +500,14 @@
                     <Hero onCreateRoom={handleCreateRoom} roomId={roomId} hide={gameState === 'playing'} />
                     {roomId && <Lobby roomId={roomId} players={players} onStartGame={handleStartGame} availableGames={availableGames} hide={gameState === 'playing'} />}
                     
-                    {/* The Unity VM Iframe Loader */}
+                    {/* The External Hosted 3D Iframe */}
                     {gameState === 'playing' && gameUrl && (
                         <iframe 
                             src={gameUrl} 
                             className="absolute inset-0 w-full h-full border-none z-50 bg-black"
                             id="unity-vm"
-                            sandbox="allow-scripts allow-same-origin"
+                            allow="gamepad; autoplay; fullscreen"
+                            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                         ></iframe>
                     )}
                 </div>

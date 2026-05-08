@@ -92,7 +92,7 @@ function handleCreateRoom(connId, data) {
   conn.ws.send(JSON.stringify({
     type: 'room-created',
     roomCode,
-    qrUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/controller/?code=${roomCode}`
+    qrUrl: `${process.env.RENDER_EXTERNAL_URL || 'https://game-store-8xi7.onrender.com'}/controller/?code=${roomCode}`
   }));
 }
 

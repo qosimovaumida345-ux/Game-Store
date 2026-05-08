@@ -33,6 +33,7 @@ class ControllerApp {
     const code = urlParams.get('code');
     if (code) {
       document.getElementById('room-code-input').value = code;
+      setTimeout(() => this.joinWithCode(), 500);
     }
   }
 

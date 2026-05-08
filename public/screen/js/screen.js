@@ -89,14 +89,21 @@ class ScreenApp {
       waitingUl.innerHTML = this.players.map(p => `<li><span class="player-dot"></span>${p}</li>`).join('');
     }
     
-    // Force UI update
+    // Show notification
     const waitingMsg = document.getElementById('waiting-message');
     if (waitingMsg) {
-      waitingMsg.innerHTML = `<p style="color: #4ecdc4;">✅ ${this.players.length} o'yinchi qo'shildi! O'yin tanlang</p>`;
+      waitingMsg.innerHTML = `<p style="color: #4ecdc4;">✅ ${this.players.length} o'yinchi qo'shildi!</p>
+        <button id="btn-go-to-games" class="btn btn-primary" style="margin-top:15px;">O'yin Tanlash</button>`;
+      
+      // Add click handler for the button
+      document.getElementById('btn-go-to-games').addEventListener('click', () => {
+        this.showGameSelect();
+      });
     }
     
+    // Auto-show game select when player joins and games are loaded
     if (this.players.length > 0 && this.gameList.length > 0) {
-      setTimeout(() => this.showGameSelect(), 500);
+      setTimeout(() => this.showGameSelect(), 800);
     }
   }
 
@@ -131,11 +138,12 @@ class ScreenApp {
 
   onGameList(data) {
     this.gameList = data.games;
+    console.log('Games loaded:', this.gameList.length);
     this.renderCategories();
     this.renderGames('all');
     
     if (this.roomCreated && this.players.length > 0) {
-      document.getElementById('waiting-message').classList.add('hidden');
+      // Auto-show game selection when games load and players are present
       this.showGameSelect();
     }
   }

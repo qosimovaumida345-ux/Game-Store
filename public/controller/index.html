@@ -328,7 +328,8 @@
             const initialCode = urlParams.get('code') || '';
 
             useEffect(() => {
-                const wsUrl = `ws://${window.location.host}/controller`;
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/controller`;
                 const ws = new WebSocket(wsUrl);
                 
                 ws.onmessage = (event) => {

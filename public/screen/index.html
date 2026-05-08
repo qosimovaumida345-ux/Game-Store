@@ -423,7 +423,8 @@
             const socketRef = useRef(null);
 
             useEffect(() => {
-                const wsUrl = `ws://${window.location.host}/screen`;
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/screen`;
                 const ws = new WebSocket(wsUrl);
                 
                 ws.onmessage = (event) => {

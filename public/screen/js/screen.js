@@ -200,9 +200,30 @@ class ScreenApp {
   }
 
   onGameStarting(data) {
+    console.log('=== GAME STARTING ===', data.gameId);
     this.currentGame = data.gameId;
-    document.getElementById('game-select-screen').classList.remove('active');
-    document.getElementById('game-screen').classList.add('active');
+    
+    // Hide game select, show game screen
+    const gameSelectScreen = document.getElementById('game-select-screen');
+    const gameScreen = document.getElementById('game-screen');
+    
+    if (gameSelectScreen) {
+      gameSelectScreen.classList.remove('active');
+      gameSelectScreen.style.display = 'none';
+    }
+    
+    if (gameScreen) {
+      gameScreen.classList.add('active');
+      gameScreen.style.display = 'block';
+      gameScreen.style.width = '100%';
+      gameScreen.style.height = '100vh';
+      gameScreen.style.position = 'fixed';
+      gameScreen.style.top = '0';
+      gameScreen.style.left = '0';
+      gameScreen.style.background = '#000';
+    }
+    
+    console.log('Game screen shown');
     
     this.layoutEngine = new LayoutEngine(document.getElementById('game-screen'));
     this.gameLoader = new GameLoader();
@@ -213,99 +234,64 @@ class ScreenApp {
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {
-    console.log('Loading game:', gameId, gameFile);
+    console.log('=== LOADING GAME ===', gameId, gameFile);
     
-    // Get canvas from DOM
+    // Get or create canvas
     let canvas = document.getElementById('game-canvas');
+    const gameScreen = document.getElementById('game-screen');
     
-    if (!canvas) {
-      // Create canvas if not exists
+    if (!canvas && gameScreen) {
       canvas = document.createElement('canvas');
       canvas.id = 'game-canvas';
-      document.getElementById('game-screen').appendChild(canvas);
+      gameScreen.appendChild(canvas);
     }
     
-    // Ensure canvas is properly sized
-    canvas.style.display = 'block';
-    canvas.style.width = '100vw';
-    canvas.style.height = '100vh';
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    // Handle window resize
-    window.onresize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      if (this.gameInstance && this.gameInstance.resizeCanvas) {
-        this.gameInstance.resizeCanvas();
-      }
-    };
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error('Failed to get canvas context');
+    if (!canvas) {
+      console.error('CANVAS NOT FOUND!');
       return;
     }
     
-    // Draw initial screen
-    ctx.fillStyle = '#000';
+    // Set canvas size to full screen
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    
+    const ctx = canvas.getContext('2d');
+    console.log('Canvas:', canvas, 'Context:', ctx ? 'OK' : 'FAIL');
+    
+    // Draw immediately
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    ctx.font = '30px Arial';
-    ctx.fillText('Loading game...', 50, 50);
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '40px Arial';
+    ctx.fillText('Loading: ' + gameFile, 50, 100);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('Canvas size: ' + canvas.width + 'x' + canvas.height, 50, 160);
     
     try {
       const gamePath = '/games/genres/' + gameFile;
-      console.log('Loading from:', gamePath);
+      console.log('Fetching:', gamePath);
       
       const GameClass = await this.gameLoader.loadGame(gameId, gamePath);
-      console.log('Game class found:', GameClass?.name);
+      console.log('GameClass:', GameClass);
       
-      // Create game instance
-      this.gameInstance = new GameClass(canvas, this.players || [], gameId);
-      console.log('Game instance:', this.gameInstance);
-      
-      // Start game
-      if (this.gameInstance && typeof this.gameInstance.start === 'function') {
-        this.gameInstance.start();
-        console.log('Game started successfully!');
-      } else {
-        console.log('No start method found');
-        this.drawSimpleGame(canvas, ctx);
+      if (GameClass) {
+        this.gameInstance = new GameClass(canvas, this.players || [], gameId);
+        console.log('Instance created, calling start()...');
+        
+        if (typeof this.gameInstance.start === 'function') {
+          this.gameInstance.start();
+          console.log('=== GAME STARTED ===');
+        }
       }
-      
-      // Ensure game screen is visible
-      document.getElementById('game-screen').classList.add('active');
-      document.getElementById('game-screen').style.display = 'block';
-      
     } catch (err) {
-      console.error('Game loading error:', err);
+      console.error('ERROR:', err);
       ctx.fillStyle = '#ff0000';
-      ctx.fillText('ERROR: ' + err.message, 50, 100);
-      document.getElementById('game-screen').classList.add('active');
+      ctx.font = '30px Arial';
+      ctx.fillText('ERROR: ' + err.message, 50, 200);
     }
-  }
-  
-  drawSimpleGame(canvas, ctx) {
-    let frame = 0;
-    const animate = () => {
-      frame++;
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw simple animation
-      ctx.fillStyle = '#4ecdc4';
-      ctx.beginPath();
-      ctx.arc(200 + Math.sin(frame * 0.05) * 150, 200, 60, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = '#fff';
-      ctx.font = '24px Arial';
-      ctx.fillText('Simple Game Running!', 50, 400);
-      
-      requestAnimationFrame(animate);
-    };
-    animate();
   }
 
   onGameStarted(data) {

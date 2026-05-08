@@ -4,6 +4,7 @@ class ScreenApp {
     this.roomCode = null;
     this.players = [];
     this.currentGame = null;
+    this.currentGameFile = null;
     this.layoutEngine = null;
     this.gameLoader = null;
     this.gameInstance = null;
@@ -194,6 +195,8 @@ class ScreenApp {
   }
 
   startGame(gameId, gameFile) {
+    console.log('Starting game:', gameId, 'file:', gameFile);
+    this.currentGameFile = gameFile;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'start-game', gameId }));
     }
@@ -230,12 +233,14 @@ class ScreenApp {
     this.gameLoader = new GameLoader();
     
     const canvases = this.layoutEngine.applyLayout(this.players.length, gameId);
+    const gameFile = this.currentGameFile || gameId;
     
-    this.loadAndStartGame(gameId, gameId, canvases);
+    console.log('Loading with file:', gameFile);
+    this.loadAndStartGame(gameId, gameFile, canvases);
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {
-    console.log('=== LOADING GAME ===', gameId, gameFile);
+    console.log('=== LOADING GAME ===', 'ID:', gameId, 'File:', gameFile);
     
     // Get or create canvas
     let canvas = document.getElementById('game-canvas');
@@ -268,11 +273,13 @@ class ScreenApp {
     ctx.fillStyle = '#00ff00';
     ctx.font = '40px Arial';
     ctx.fillText('Loading: ' + gameFile, 50, 100);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('Canvas size: ' + canvas.width + 'x' + canvas.height, 50, 160);
     
     try {
-      const gamePath = '/games/genres/' + gameFile;
+      // Fix: ensure proper path
+      let gamePath = gameFile;
+      if (!gamePath.startsWith('/games/genres/')) {
+        gamePath = '/games/genres/' + gameFile;
+      }
       console.log('Fetching:', gamePath);
       
       const GameClass = await this.gameLoader.loadGame(gameId, gamePath);

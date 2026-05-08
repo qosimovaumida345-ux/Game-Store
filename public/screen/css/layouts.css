@@ -1,55 +1,97 @@
-/* Layouts for 1-8 players */
+/* Layouts for multi-player views */
 
-#game-screen { position: relative; }
+#game-screen {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
 
+#game-screen.active {
+  display: block;
+  background: #000;
+}
+
+#game-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.player-view {
+  position: relative;
+  overflow: hidden;
+  background: #0a0a1a;
+}
+
+.player-view canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.player-info {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+.player-name {
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.player-score {
+  color: #06b6d4;
+}
+
+/* Single player */
 #game-screen.single-player #game-canvas {
   width: 100%;
   height: 100%;
 }
 
+/* Split vertical (2 players) */
 #game-screen.split-vertical {
-  display: flex;
-  flex-direction: column;
-}
-
-#game-screen.split-vertical .player-view {
-  flex: 1;
-  border-bottom: 2px solid rgba(255,255,255,0.2);
-  position: relative;
-}
-
-#game-screen.split-vertical .player-view:last-child {
-  border-bottom: none;
-}
-
-#game-screen.split-horizontal {
   display: flex;
   flex-direction: row;
 }
 
-#game-screen.split-horizontal .player-view {
+#game-screen.split-vertical .player-view {
   flex: 1;
-  border-right: 2px solid rgba(255,255,255,0.2);
+  border-right: 2px solid rgba(124, 58, 237, 0.3);
 }
 
-#game-screen.split-horizontal .player-view:last-child {
+#game-screen.split-vertical .player-view:last-child {
   border-right: none;
 }
 
+/* 2x2 Grid (3-4 players) */
 #game-screen.split-grid-2x2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 3px;
-}
-
-#game-screen.split-grid-3x3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
   gap: 2px;
 }
 
+/* 3x2 Grid (5-6 players) */
+#game-screen.split-grid-3x2 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+}
+
+/* 4x2 Grid (7-8 players) */
 #game-screen.split-grid-4x2 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -57,13 +99,7 @@
   gap: 2px;
 }
 
-#game-screen.split-grid-4x4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
-  gap: 2px;
-}
-
+/* Racing layout */
 #game-screen.racing-layout {
   display: flex;
   flex-direction: column;
@@ -71,43 +107,9 @@
 
 #game-screen.racing-layout .player-view {
   flex: 1;
-  border-bottom: 3px solid rgba(255,255,255,0.2);
+  border-bottom: 2px solid rgba(124, 58, 237, 0.3);
 }
 
-.player-view {
-  position: relative;
-  overflow: hidden;
-  background: #1a1a2e;
-}
-
-.player-view canvas {
-  width: 100%;
-  height: 100%;
-}
-
-.player-info {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0,0,0,0.7);
-  padding: 8px 15px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  z-index: 10;
-  display: flex;
-  gap: 10px;
-}
-
-.player-name {
-  font-weight: bold;
-  color: #ffd93d;
-}
-
-.player-score {
-  color: #4ecdc4;
-}
-
-.player-view.split-mode canvas {
-  width: 100%;
-  height: 100%;
+#game-screen.racing-layout .player-view:last-child {
+  border-bottom: none;
 }

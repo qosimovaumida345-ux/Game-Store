@@ -1,49 +1,517 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gaming Platform 500+</title>
-  <link rel="stylesheet" href="css/screen.css">
-  <link rel="stylesheet" href="css/layouts.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTX Gaming - Next Gen 3D WebGL</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['"Instrument Serif"', 'serif'],
+                        body: ['Barlow', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        DEFAULT: "9999px"
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 3D Engine (Three.js) & QRious -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+    <!-- Liquid Glass Utilities -->
+    <style>
+        body {
+            background-color: #000;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+        #game-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease-in-out;
+            background: #000;
+        }
+        #game-container.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #game-ui {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px;
+            pointer-events: none;
+        }
+        .anim-rotate {
+            animation: rotate_3d 10s infinite linear;
+        }
+        @keyframes rotate_3d {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .liquid-glass {
+            background: rgba(255,255,255,0.01);
+            background-blend-mode: luminosity;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .liquid-glass-strong {
+            background: rgba(255,255,255,0.01);
+            background-blend-mode: luminosity;
+            backdrop-filter: blur(50px);
+            -webkit-backdrop-filter: blur(50px);
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 4px 4px 4px rgba(0,0,0,0.05), inset 0 1px 1px rgba(255,255,255,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+
+    <!-- React & Framer Motion -->
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.0/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@11.11.17/dist/framer-motion.js"></script>
 </head>
 <body>
-  <div id="app">
-    <div id="room-create-screen" class="screen active">
-      <h1>Gaming Platform 500+</h1>
-      <button id="btn-create-room" class="btn btn-primary">O'yin Boshlash</button>
-      <div id="room-info" class="hidden">
-        <h2>Xona Kodi: <span id="room-code"></span></h2>
-        <div id="qr-code"></div>
-        <p>Telefoningizdan saytga kiring va kodni kiriting</p>
-        <div id="waiting-message" class="waiting-message">
-          <div class="spinner"></div>
-          <p>Kuting... O'yinchilar qo'shilishini kuting</p>
+    <div id="root"></div>
+
+    <!-- Loading Animation Container (3D Voyage) -->
+    <div id="game-container">
+        <div id="game-ui">
+            <h1 class="font-heading italic text-6xl text-white tracking-[-2px]" style="text-shadow: 0 0 20px rgba(255,255,255,0.5)">INITIALIZING UNITY VM ENVIRONMENT...</h1>
+            <p class="text-xl font-body mt-4 text-white/80">Connecting 4K 60FPS Render Engine. Please wait...</p>
+            <div class="mt-auto">
+                <button id="btn-return" class="liquid-glass-strong px-6 py-3 rounded-full text-white cursor-pointer hover:bg-white/10" style="pointer-events: auto;">Abort Loading</button>
+            </div>
         </div>
-        <div id="waiting-players-list-container" class="players-on-screen">
-          <h3>Qo'shilgan o'yinchilar:</h3>
-          <ul id="waiting-players-ul"></ul>
-        </div>
-      </div>
     </div>
 
-    <div id="game-select-screen" class="screen">
-      <h1>O'yin Tanlang</h1>
-      <div id="players-list">
-        <h3>Qo'shilgan O'yinchilar:</h3>
-        <ul id="players-ul"></ul>
-      </div>
-      <div id="games-categories"></div>
-      <div id="games-grid"></div>
-    </div>
+    <!-- 3D Game Engine (Three.js Galaxy Generator) -->
+    <script>
+        function start3DGame() {
+            const container = document.getElementById('game-container');
+            container.classList.add('active');
+            
+            if (window.gameInitialized) return;
+            window.gameInitialized = true;
 
-    <div id="game-screen" class="screen">
-      <canvas id="game-canvas"></canvas>
-    </div>
-  </div>
+            const scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.001);
+            
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // insert before UI
+            container.insertBefore(renderer.domElement, document.getElementById('game-ui'));
 
-  <script src="js/layoutEngine.js"></script>
-  <script src="js/gameLoader.js"></script>
-  <script src="js/screen.js"></script>
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            const colors = [];
+            const sizes = [];
+
+            // Enhance starfield for Unity VM loading illusion
+            for ( let i = 0; i < 30000; i ++ ) {
+                const x = (Math.random() - 0.5) * 3000;
+                const y = (Math.random() - 0.5) * 3000;
+                const z = (Math.random() - 0.5) * 3000;
+                vertices.push( x, y, z );
+                
+                const vx = (x / 3000) + 0.5;
+                const vy = (y / 3000) + 0.5;
+                const vz = (z / 3000) + 0.5;
+                colors.push(vx, 0.5 + vy*0.5, 1.0);
+                
+                sizes.push(Math.random() * 2.5);
+            }
+
+            geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
+            geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
+            geometry.setAttribute( 'size', new THREE.Float32BufferAttribute( sizes, 1 ) );
+
+            const material = new THREE.PointsMaterial({ 
+                size: 2, 
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                sizeAttenuation: true
+            });
+
+            const points = new THREE.Points( geometry, material );
+            scene.add( points );
+
+            camera.position.z = 0;
+
+            function animate() {
+                requestAnimationFrame( animate );
+                
+                points.rotation.y += 0.0008;
+                points.rotation.x += 0.0003;
+                
+                // Acceleration effect
+                camera.position.z -= 4;
+                if(camera.position.z < -1500) camera.position.z = 1500;
+
+                renderer.render( scene, camera );
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        document.getElementById('btn-return').addEventListener('click', () => {
+            document.getElementById('game-container').classList.remove('active');
+        });
+    </script>
+
+    <!-- React Application -->
+    <script type="text/babel">
+        const { motion } = window.Motion;
+        const { useEffect, useRef, useState, useCallback } = React;
+
+        function FadingVideo({ src, className, style, show = true }) {
+            const videoRef = useRef(null);
+            
+            useEffect(() => {
+                const video = videoRef.current;
+                if (!video) return;
+                video.play().catch(e => console.log('Auto-play prevented:', e));
+                video.style.opacity = show ? '1' : '0';
+            }, [show]);
+
+            return (
+                <video
+                    ref={videoRef}
+                    src={src}
+                    className={className}
+                    style={{ ...style, transition: 'opacity 1s ease-in', opacity: show ? '1' : '0' }}
+                    autoPlay muted loop playsInline preload="auto"
+                />
+            );
+        }
+
+        function BlurText({ text, className }) {
+            const words = text.split(' ');
+            return (
+                <p className={className} style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', rowGap: '0.1em' }}>
+                    {words.map((word, i) => (
+                        <motion.span
+                            key={i}
+                            initial={{ filter: 'blur(10px)', opacity: 0, y: 50 }}
+                            whileInView={{ filter: ['blur(10px)', 'blur(5px)', 'blur(0px)'], opacity: [0, 0.5, 1], y: [50, -5, 0] }}
+                            viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+                            transition={{ duration: 0.7, times: [0, 0.5, 1], ease: 'easeOut', delay: (i * 100) / 1000 }}
+                            style={{ display: 'inline-block', marginRight: typeof word !== 'undefined' ? '0.28em' : 0 }}
+                        >
+                            {word}
+                        </motion.span>
+                    ))}
+                </p>
+            );
+        }
+
+        const ArrowUpRight = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 ml-1">
+                <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+            </svg>
+        );
+
+        function Hero({ onCreateRoom, roomId, hide }) {
+            if (hide) return null;
+            return (
+                <section className="relative min-h-screen flex flex-col pt-24 pb-8 overflow-hidden">
+                    <FadingVideo 
+                        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_080021_d598092b-c4c2-4e53-8e46-94cf9064cd50.mp4"
+                        className="absolute left-1/2 top-0 -translate-x-1/2 object-cover object-top z-0"
+                        style={{ width: "120%", height: "120%" }}
+                    />
+
+                    <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full h-full">
+                        <motion.div 
+                            initial={{ filter: 'blur(10px)', opacity: 0, y: 20 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
+                            className="liquid-glass rounded-full flex items-center pl-1 pr-3 py-1 mb-6"
+                        >
+                            <span className="bg-white text-black px-3 py-1 text-xs font-semibold rounded-full mr-3">VTX UPDATE</span>
+                            <span className="text-sm text-white/90 font-body">Unity 3D WebGL Virtual Machine Available</span>
+                        </motion.div>
+
+                        <BlurText 
+                            text="Experience Next-Gen Cloud Rendering"
+                            className="text-6xl md:text-7xl lg:text-[5.5rem] font-heading italic text-white leading-[0.8] max-w-2xl text-center tracking-[-4px]"
+                        />
+
+                        <motion.div 
+                            initial={{ filter: 'blur(10px)', opacity: 0, y: 20 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, ease: 'easeOut', delay: 1.1 }}
+                            className="flex items-center justify-center gap-6 mt-12"
+                        >
+                            {!roomId ? (
+                                <button 
+                                    onClick={onCreateRoom}
+                                    className="liquid-glass-strong rounded-full px-6 py-3 text-lg font-medium text-white flex items-center cursor-pointer hover:bg-white/10 transition-colors"
+                                >
+                                    Create Room <ArrowUpRight />
+                                </button>
+                            ) : (
+                                <div className="liquid-glass-strong rounded-full px-6 py-3 text-lg font-medium text-white/50">
+                                    Room Active: Scroll down
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                </section>
+            );
+        }
+
+        function QRCodeGen({ value }) {
+            const canvasRef = useRef(null);
+            useEffect(() => {
+                if (canvasRef.current && window.QRious) {
+                    new window.QRious({
+                        element: canvasRef.current,
+                        value: value,
+                        size: 200,
+                        background: 'transparent',
+                        foreground: 'white'
+                    });
+                }
+            }, [value]);
+            return <canvas ref={canvasRef} className="opacity-90"></canvas>;
+        }
+
+        function Lobby({ roomId, players, onStartGame, availableGames, hide }) {
+            if (hide) return null;
+            const joinUrl = `http://${window.location.host}/controller/`;
+            
+            return (
+                <section className="relative min-h-screen z-10 w-full overflow-hidden flex flex-col pb-16">
+                    <FadingVideo 
+                        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_094631_d30ab262-45ee-4b7d-99f3-5d5848c8ef13.mp4"
+                        className="absolute inset-0 w-full h-full object-cover z-0"
+                    />
+
+                    <div className="relative z-10 px-8 md:px-16 lg:px-20 pt-24 pb-16 min-h-screen flex flex-col md:flex-row gap-12 max-w-7xl mx-auto w-full">
+                        
+                        {/* Left Side: Room Code & QR */}
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <h2 className="font-heading italic text-white text-5xl md:text-6xl mb-8 tracking-[-2px]">
+                                Join the Mission
+                            </h2>
+                            
+                            <div className="liquid-glass-strong rounded-[2rem] p-8 w-full max-w-sm flex flex-col items-center">
+                                <p className="text-white/60 text-sm font-body uppercase tracking-widest mb-4">Connection Code</p>
+                                <div className="text-white font-heading italic text-7xl tracking-widest mb-8">
+                                    {roomId || "------"}
+                                </div>
+                                
+                                {roomId && (
+                                    <>
+                                        <div className="bg-white/5 p-4 rounded-xl">
+                                            <QRCodeGen value={`${joinUrl}?code=${roomId}`} />
+                                        </div>
+                                        <p className="text-white/50 text-xs font-body mt-4 text-center">Scan or go to {joinUrl}</p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Side: Players List */}
+                        <div className="flex-1 flex flex-col justify-center">
+                            <p className="text-sm font-body text-white/80 mb-6 uppercase tracking-wider">// CREW MEMBERS ({players.length}/8)</p>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                {players.map((p, i) => (
+                                    <motion.div 
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        key={i} 
+                                        className="liquid-glass rounded-xl p-4 flex items-center gap-4"
+                                    >
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: p.color || '#fff'}}>
+                                            <span className="text-black font-body font-bold text-lg">{p.name.charAt(0).toUpperCase()}</span>
+                                        </div>
+                                        <span className="text-white font-body text-lg font-medium">{p.name}</span>
+                                    </motion.div>
+                                ))}
+                                
+                                {players.length === 0 && (
+                                    <div className="col-span-2 liquid-glass rounded-xl p-8 flex flex-col items-center justify-center border border-white/5 border-dashed">
+                                        <p className="text-white/40 font-body">Waiting for crew members to join...</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Games List (Shows when players join) */}
+                            {players.length > 0 && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mt-12"
+                                >
+                                    <p className="text-sm font-body text-white/80 mb-6 uppercase tracking-wider">// AVAILABLE WEBGL GAMES ({availableGames.length})</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[40vh] overflow-y-auto pr-2" style={{scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent'}}>
+                                        {availableGames.length === 0 && (
+                                            <div className="col-span-1 md:col-span-2 text-white/50 italic text-sm text-center py-4">No Auto-Built WebGL Games found yet.</div>
+                                        )}
+                                        {availableGames.map((game, i) => (
+                                            <div 
+                                                key={i}
+                                                onClick={() => onStartGame(game.path)}
+                                                className="liquid-glass rounded-xl p-6 cursor-pointer hover:bg-white/10 transition-colors group"
+                                            >
+                                                <h3 className="font-heading italic text-white text-3xl mb-2 group-hover:text-[#00ffcc] transition-colors">{game.name}</h3>
+                                                <p className="text-white/60 text-sm font-body uppercase tracking-wider">{game.genre}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-white/40 text-xs italic mt-4 text-center">Clicking any game will trigger Unity VM Loader animation.</p>
+                                </motion.div>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            );
+        }
+
+        function App() {
+            const [roomId, setRoomId] = useState(null);
+            const [players, setPlayers] = useState([]);
+            const [gameState, setGameState] = useState('lobby'); // lobby, playing
+            const [gameUrl, setGameUrl] = useState(null);
+            const [availableGames, setAvailableGames] = useState([]);
+            const socketRef = useRef(null);
+
+            useEffect(() => {
+                const wsUrl = `ws://${window.location.host}/screen`;
+                const ws = new WebSocket(wsUrl);
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('WS Data:', data);
+                    
+                    if (data.type === 'room-created') {
+                        setRoomId(data.roomId);
+                        window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+                    }
+                    else if (data.type === 'player-joined') {
+                        setPlayers(prev => [...prev, { name: data.playerName, color: data.color || '#3498db' }]);
+                    }
+                    else if (data.type === 'player-left') {
+                        setPlayers(prev => prev.filter(p => p.name !== data.playerName));
+                    }
+                    else if (data.type === 'game-list') {
+                        setAvailableGames(data.games || []);
+                    }
+                };
+                
+                socketRef.current = ws;
+
+                // Optionally, fetch games list straight away when connected
+                ws.onopen = () => {
+                    setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'get-games' }));
+                        }
+                    }, 5000); // Poll for newly auto-built games every 5 secs!
+                };
+
+                return () => {
+                    if(ws.readyState === WebSocket.OPEN) ws.close();
+                };
+            }, []);
+
+            const handleCreateRoom = () => {
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({ type: 'create-room' }));
+                } else {
+                    alert("Not connected to server yet. Ensure 'npm run dev' is active.");
+                }
+            };
+
+            const handleStartGame = (url) => {
+                setGameUrl(url);
+                setGameState('playing');
+                window.start3DGame(); // Activate galaxy loader
+                
+                if (socketRef.current) {
+                    socketRef.current.send(JSON.stringify({ type: 'start-game', gameId: 'unity-demo' }));
+                }
+
+                // In a real scenario, the iframe sends a message 'unity-ready'. For demo:
+                window.addEventListener('message', (e) => {
+                    if(e.data === 'unity-ready') {
+                        document.getElementById('game-container').classList.remove('active');
+                    }
+                });
+
+                // Fail-safe to remove loading screen after 6 secs
+                setTimeout(() => {
+                    document.getElementById('game-container').classList.remove('active');
+                }, 6000);
+            };
+
+            return (
+                <div className="bg-black min-h-screen text-white font-body antialiased relative">
+                    <Hero onCreateRoom={handleCreateRoom} roomId={roomId} hide={gameState === 'playing'} />
+                    {roomId && <Lobby roomId={roomId} players={players} onStartGame={handleStartGame} availableGames={availableGames} hide={gameState === 'playing'} />}
+                    
+                    {/* The Unity VM Iframe Loader */}
+                    {gameState === 'playing' && gameUrl && (
+                        <iframe 
+                            src={gameUrl} 
+                            className="absolute inset-0 w-full h-full border-none z-50 bg-black"
+                            id="unity-vm"
+                            sandbox="allow-scripts allow-same-origin"
+                        ></iframe>
+                    )}
+                </div>
+            );
+        }
+
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
 </body>
 </html>

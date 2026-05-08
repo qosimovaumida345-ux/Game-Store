@@ -1,54 +1,392 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Gaming Platform - Controller</title>
-  <link rel="stylesheet" href="css/controller.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VTX Controller</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['"Instrument Serif"', 'serif'],
+                        body: ['Barlow', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.0/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@11.11.17/dist/framer-motion.js"></script>
+
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none; /* Prevent accidental scrolling on mobile */
+        }
+        
+        .liquid-glass {
+            background: rgba(255,255,255,0.02);
+            background-blend-mode: luminosity;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .liquid-glass-strong {
+            background: rgba(255,255,255,0.05);
+            background-blend-mode: luminosity;
+            backdrop-filter: blur(50px);
+            -webkit-backdrop-filter: blur(50px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2);
+            position: relative;
+        }
+
+        /* Virtual JoyStick Background */
+        .joystick-zone {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 70%);
+            border: 2px dashed rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* The thumb stick itself */
+        .joystick-nub {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(255,255,255,0.5);
+            position: absolute;
+            transition: transform 0.05s linear;
+        }
+        
+        .action-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Barlow', sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #fff;
+            user-select: none;
+            transition: all 0.1s ease;
+        }
+        .action-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+    </style>
 </head>
 <body>
-  <div id="app">
-    <div id="code-entry-screen" class="screen active">
-      <h1>Gaming Platform</h1>
-      <p>Xona kodini kiriting:</p>
-      <div id="code-input">
-        <input type="text" id="room-code-input" maxlength="6" placeholder="000000" pattern="[0-9]*" inputmode="numeric">
-        <button id="btn-join-code" class="btn btn-primary">Qo'shilish</button>
-      </div>
-    </div>
+    <div id="root"></div>
 
-    <div id="name-entry-screen" class="screen">
-      <h2>Ismingizni Kiriting</h2>
-      <input type="text" id="player-name-input" placeholder="Ismingiz..." maxlength="20">
-      <button id="btn-submit-name" class="btn btn-primary">Kirish</button>
-    </div>
+    <script type="text/babel">
+        const { motion } = window.Motion;
+        const { useEffect, useRef, useState, useCallback } = React;
 
-    <div id="waiting-screen" class="screen">
-      <h2>Xona: <span id="display-room-code"></span></h2>
-      <p>Kuting...</p>
-      <div id="players-waiting">
-        <h3>Qo'shilgan o'yinchilar:</h3>
-        <ul id="waiting-players-list"></ul>
-      </div>
-    </div>
+        function FadingVideo({ src }) {
+            const videoRef = useRef(null);
+            useEffect(() => {
+                if (videoRef.current) {
+                    videoRef.current.play().catch(e => console.log('Autoplay prevented:', e));
+                }
+            }, []);
+            return (
+                <video
+                    ref={videoRef}
+                    src={src}
+                    className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 blur-sm mix-blend-screen"
+                    autoPlay muted loop playsInline
+                />
+            );
+        }
 
-    <div id="controller-screen" class="screen">
-      <div id="game-info">
-        <span id="player-display-name"></span>
-        <span id="game-score">Ball: 0</span>
-      </div>
-      <div id="controller-buttons"></div>
-    </div>
-  </div>
+        function JoinScreen({ onJoin, urlCode }) {
+            const [code, setCode] = useState(urlCode || '');
+            const [name, setName] = useState('');
 
-  <script src="js/inputTypes/racing.js"></script>
-  <script src="js/inputTypes/platformer.js"></script>
-  <script src="js/inputTypes/fighting.js"></script>
-  <script src="js/inputTypes/puzzle.js"></script>
-  <script src="js/inputTypes/shooter.js"></script>
-  <script src="js/inputTypes/sports.js"></script>
-  <script src="js/inputTypes/arcade.js"></script>
-  <script src="js/inputTypes/default.js"></script>
-  <script src="js/controller.js"></script>
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if(code && name) onJoin(code, name);
+            };
+
+            return (
+                <div className="relative min-h-screen flex items-center justify-center p-6">
+                    <FadingVideo src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_094631_d30ab262-45ee-4b7d-99f3-5d5848c8ef13.mp4" />
+                    
+                    <motion.div 
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative z-10 w-full max-w-sm"
+                    >
+                        <div className="text-center mb-8">
+                            <h1 className="font-heading italic text-5xl tracking-[-1px]">VTX Console</h1>
+                            <p className="text-white/60 font-body text-sm uppercase tracking-widest mt-2">Mobile Interface</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="liquid-glass-strong rounded-3xl p-8 flex flex-col gap-6">
+                            <div>
+                                <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Connection Code</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-center font-heading italic text-3xl tracking-widest focus:outline-none focus:border-white/50"
+                                    value={code}
+                                    onChange={e => setCode(e.target.value.toUpperCase())}
+                                    placeholder="000000"
+                                    maxLength={6}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-body text-white/50 uppercase tracking-widest mb-2">Callsign (Name)</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white font-body text-lg focus:outline-none focus:border-white/50"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    placeholder="Enter your name"
+                                    required
+                                />
+                            </div>
+                            <button 
+                                type="submit"
+                                className="w-full bg-white text-black font-body font-bold text-lg rounded-xl py-3 mt-4 hover:bg-white/90 active:scale-95 transition-all"
+                            >
+                                CONNECT <span className="ml-2">→</span>
+                            </button>
+                        </form>
+                    </motion.div>
+                </div>
+            );
+        }
+
+        function LobbyScreen({ name }) {
+            return (
+                <div className="relative min-h-screen flex items-center justify-center p-6">
+                    <FadingVideo src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_094631_d30ab262-45ee-4b7d-99f3-5d5848c8ef13.mp4" />
+                    
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative z-10 liquid-glass-strong rounded-[2rem] p-8 text-center"
+                    >
+                        <div className="w-16 h-16 rounded-full bg-white/10 mx-auto flex items-center justify-center mb-6">
+                            <span className="text-2xl">📡</span>
+                        </div>
+                        <h2 className="font-heading italic text-4xl mb-2">Linked as {name}</h2>
+                        <p className="text-white/60 font-body">Observe the main screen.<br/>Awaiting command to start.</p>
+                        
+                        <div className="mt-8 flex justify-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{animationDelay: '0s'}}></div>
+                            <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                            <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                        </div>
+                    </motion.div>
+                </div>
+            );
+        }
+
+        function GamepadScreen({ onInput }) {
+            // Very simple mobile joystick + action buttons
+            const joystickRef = useRef(null);
+            const nubRef = useRef(null);
+            const [touchId, setTouchId] = useState(null);
+
+            const handleTouchStart = (e) => {
+                const touch = e.targetTouches[0];
+                setTouchId(touch.identifier);
+                updateJoystick(touch.clientX, touch.clientY);
+            };
+
+            const handleTouchMove = (e) => {
+                if(touchId === null) return;
+                for(let i=0; i<e.changedTouches.length; i++) {
+                    if(e.changedTouches[i].identifier === touchId) {
+                        updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                        break;
+                    }
+                }
+            };
+
+            const handleTouchEnd = (e) => {
+                for(let i=0; i<e.changedTouches.length; i++) {
+                    if(e.changedTouches[i].identifier === touchId) {
+                        setTouchId(null);
+                        resetJoystick();
+                        break;
+                    }
+                }
+            };
+
+            const updateJoystick = (clientX, clientY) => {
+                const rect = joystickRef.current.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                let dx = clientX - centerX;
+                let dy = clientY - centerY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const maxRadius = rect.width / 2;
+
+                if (distance > maxRadius) {
+                    dx = (dx / distance) * maxRadius;
+                    dy = (dy / distance) * maxRadius;
+                }
+
+                if(nubRef.current) {
+                    nubRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+                }
+
+                // Send normalized input to server
+                onInput('joystick', { x: dx/maxRadius, y: dy/maxRadius });
+            };
+
+            const resetJoystick = () => {
+                if(nubRef.current) {
+                    nubRef.current.style.transform = `translate(0px, 0px)`;
+                }
+                onInput('joystick', { x: 0, y: 0 });
+            };
+
+            return (
+                <div className="relative min-h-screen flex flex-col bg-black overflow-hidden" 
+                     onTouchMove={e => e.preventDefault()}> {/* Prevent scrolling */}
+                    
+                    <div className="flex-1 flex items-center justify-between px-12 pb-8">
+                        {/* Joystick */}
+                        <div 
+                            ref={joystickRef}
+                            className="joystick-zone"
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                            onTouchCancel={handleTouchEnd}
+                        >
+                            <div ref={nubRef} className="joystick-nub pointer-events-none"></div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-6 relative" style={{top: '20px'}}>
+                            <div 
+                                className="action-btn"
+                                onTouchStart={() => onInput('btnA', true)}
+                                onTouchEnd={() => onInput('btnA', false)}
+                                style={{ transform: 'translateY(30px)' }}
+                            >
+                                A
+                            </div>
+                            <div 
+                                className="action-btn"
+                                onTouchStart={() => onInput('btnB', true)}
+                                onTouchEnd={() => onInput('btnB', false)}
+                                style={{ transform: 'translateY(-30px)' }}
+                            >
+                                B
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [gameState, setGameState] = useState('login'); // login | lobby | playing
+            const [playerName, setPlayerName] = useState('');
+            const socketRef = useRef(null);
+
+            // Extract code from URL if exists
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialCode = urlParams.get('code') || '';
+
+            useEffect(() => {
+                const wsUrl = `ws://${window.location.host}/controller`;
+                const ws = new WebSocket(wsUrl);
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'joined-room') {
+                        setGameState('lobby');
+                    } else if (data.type === 'game-started') {
+                        setGameState('playing');
+                    } else if (data.type === 'game-ended') {
+                        setGameState('lobby');
+                    } else if (data.type === 'error') {
+                        alert("Error: " + data.message);
+                    }
+                };
+
+                socketRef.current = ws;
+
+                return () => {
+                    if(ws.readyState === WebSocket.OPEN) ws.close();
+                };
+            }, []);
+
+            const handleJoin = (code, name) => {
+                setPlayerName(name);
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({
+                        type: 'join-room',
+                        roomCode: code,
+                        playerName: name
+                    }));
+                } else {
+                    alert('Connecting to server...');
+                }
+            };
+
+            const handleInput = (inputId, value) => {
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({
+                        type: 'game-input',
+                        inputId,
+                        value
+                    }));
+                }
+            };
+
+            return (
+                <div className="min-h-screen text-white font-body selection:bg-white/20">
+                    {gameState === 'login' && <JoinScreen onJoin={handleJoin} urlCode={initialCode} />}
+                    {gameState === 'lobby' && <LobbyScreen name={playerName} />}
+                    {gameState === 'playing' && <GamepadScreen onInput={handleInput} />}
+                </div>
+            );
+        }
+
+        const rootE = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootE);
+        root.render(<App />);
+    </script>
 </body>
 </html>

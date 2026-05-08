@@ -127,6 +127,17 @@ class ScreenApp {
     document.getElementById('game-select-screen').classList.add('active');
     this.updatePlayersList();
     
+    // Add START button if not already added
+    if (!document.getElementById('btn-start-now')) {
+      const startBtn = document.createElement('button');
+      startBtn.id = 'btn-start-now';
+      startBtn.className = 'btn btn-primary';
+      startBtn.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 1000; padding: 15px 30px; font-size: 1.2rem;';
+      startBtn.textContent = 'Hozir Boshlash';
+      startBtn.onclick = () => this.showGameSelect();
+      document.body.appendChild(startBtn);
+    }
+    
     // Ensure games are rendered
     if (this.gameList.length > 0) {
       this.renderCategories();
@@ -202,38 +213,52 @@ class ScreenApp {
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {
-    console.log('Loading game:', gameId, gameFile);
+    console.log('Loading game:', gameId, gameFile, 'Canvases:', canvases?.length);
+    
     try {
       const gamePath = `/games/genres/${gameFile}`;
-      console.log('Game path:', gamePath);
       
       const GameClass = await this.gameLoader.loadGame(gameId, gamePath);
-      console.log('Game class found:', GameClass);
+      console.log('Game class found:', GameClass?.name || GameClass);
       
-      if (!canvases || canvases.length === 0) {
-        console.error('No canvas available');
-        return;
+      if (!canvases || canvases.length === 0 || !canvases[0]) {
+        throw new Error('Canvas mavjud emas!');
       }
       
       const canvas = canvases[0];
-      console.log('Canvas:', canvas);
+      console.log('Canvas:', canvas, 'width:', canvas.width, 'height:', canvas.height);
       
+      // Ensure canvas has proper size
+      canvas.width = canvas.width || 800;
+      canvas.height = canvas.height || 600;
+      
+      // Get context
+      const ctx = canvas.getContext('2d');
+      console.log('Context:', ctx);
+      
+      // Create game instance
       this.gameInstance = new GameClass(canvas, this.players, gameId);
-      console.log('Game instance created, starting...');
+      console.log('Game instance:', this.gameInstance);
       
-      if (this.gameInstance.start) {
+      if (this.gameInstance && typeof this.gameInstance.start === 'function') {
         this.gameInstance.start();
-        console.log('Game started!');
+        console.log('Game started successfully!');
+        
+        // Hide game select and show game screen
+        document.getElementById('game-select-screen').classList.remove('active');
+        document.getElementById('game-screen').classList.add('active');
       } else {
-        console.error('Game class has no start() method');
+        throw new Error('Game class da start() method yo\'q');
       }
     } catch (err) {
       console.error('Game loading error:', err);
-      // Show error on screen
+      
+      // Show error on screen with debug info
       const gameScreen = document.getElementById('game-screen');
-      gameScreen.innerHTML = `<div style="color: red; padding: 20px; text-align: center;">
-        <h2>O'yin Yuklanmadi</h2>
-        <p>${err.message}</p>
+      gameScreen.innerHTML = `<div style="color: #ff6b6b; padding: 40px; text-align: center; background: rgba(0,0,0,0.8); height: 100vh;">
+        <h2>O'yin Yuklanmadi!</h2>
+        <p style="color: #ccc;">Xato: ${err.message}</p>
+        <button onclick="location.reload()" style="padding: 15px 30px; margin-top: 20px; cursor: pointer; background: #4ecdc4; border: none; border-radius: 8px;">Qayta urinish</button>
       </div>`;
     }
   }

@@ -40,6 +40,10 @@ class LayoutEngine {
   createSinglePlayerCanvas() {
     const mainCanvas = document.getElementById('game-canvas');
     mainCanvas.style.display = 'block';
+    mainCanvas.style.width = '100%';
+    mainCanvas.style.height = '100%';
+    mainCanvas.width = window.innerWidth;
+    mainCanvas.height = window.innerHeight;
     this.canvases.push(mainCanvas);
   }
 

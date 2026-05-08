@@ -286,15 +286,20 @@ class ScreenApp {
       console.log('GameClass:', GameClass);
       
       if (GameClass) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
         this.gameInstance = new GameClass(canvas, this.players || [], gameId);
         console.log('Instance created, calling start()...');
         
-        if (typeof this.gameInstance.start === 'function') {
-          this.gameInstance.start();
+        setTimeout(() => {
           canvas.width = window.innerWidth;
           canvas.height = window.innerHeight;
-          console.log('=== GAME STARTED ===');
-        }
+          if (this.gameInstance && typeof this.gameInstance.start === 'function') {
+            this.gameInstance.start();
+            console.log('=== GAME STARTED ===');
+          }
+        }, 200);
       }
     } catch (err) {
       console.error('ERROR:', err);

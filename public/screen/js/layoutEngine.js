@@ -52,6 +52,8 @@ class LayoutEngine {
       const view = this.createPlayerView(`player-${i}`);
       const canvas = document.createElement('canvas');
       canvas.id = `canvas-player-${i}`;
+      canvas.width = 800;
+      canvas.height = 600;
       view.appendChild(canvas);
       this.canvases.push(canvas);
     }
@@ -66,6 +68,8 @@ class LayoutEngine {
       const view = this.createPlayerView(`player-${i}`);
       const canvas = document.createElement('canvas');
       canvas.id = `canvas-player-${i}`;
+      canvas.width = 800;
+      canvas.height = 600;
       view.appendChild(canvas);
       this.canvases.push(canvas);
     }
@@ -81,6 +85,8 @@ class LayoutEngine {
       const view = this.createPlayerView(`player-${i}`);
       const canvas = document.createElement('canvas');
       canvas.id = `canvas-player-${i}`;
+      canvas.width = 800;
+      canvas.height = 600;
       view.appendChild(canvas);
       this.canvases.push(canvas);
     }

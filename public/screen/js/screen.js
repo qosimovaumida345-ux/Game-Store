@@ -202,13 +202,39 @@ class ScreenApp {
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {
+    console.log('Loading game:', gameId, gameFile);
     try {
-      const GameClass = await this.gameLoader.loadGame(gameId, `/games/genres/${gameFile}`);
+      const gamePath = `/games/genres/${gameFile}`;
+      console.log('Game path:', gamePath);
+      
+      const GameClass = await this.gameLoader.loadGame(gameId, gamePath);
+      console.log('Game class found:', GameClass);
+      
+      if (!canvases || canvases.length === 0) {
+        console.error('No canvas available');
+        return;
+      }
+      
       const canvas = canvases[0];
+      console.log('Canvas:', canvas);
+      
       this.gameInstance = new GameClass(canvas, this.players, gameId);
-      this.gameInstance.start();
+      console.log('Game instance created, starting...');
+      
+      if (this.gameInstance.start) {
+        this.gameInstance.start();
+        console.log('Game started!');
+      } else {
+        console.error('Game class has no start() method');
+      }
     } catch (err) {
       console.error('Game loading error:', err);
+      // Show error on screen
+      const gameScreen = document.getElementById('game-screen');
+      gameScreen.innerHTML = `<div style="color: red; padding: 20px; text-align: center;">
+        <h2>O'yin Yuklanmadi</h2>
+        <p>${err.message}</p>
+      </div>`;
     }
   }
 

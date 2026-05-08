@@ -57,7 +57,6 @@ const genres = [
 ];
 
 const gameNames = {
-  racing: [
   racing: ['Formula 1 Pro', 'Rally Championship', 'Drag Racing', 'NASCAR Legends', 'Drift Kings', 'Off-Road Warriors', 'Monster Truck Mania', 'MotoGP Racer', 'Boat Racing Pro', 'Space Velocity'],
   platformer: ['Super Jump Adventure', 'Sky Runner', 'Ice Climber', 'Desert Runner', 'Forest Quest', 'Cave Explorer', 'City Parkour', 'Beach Dash', 'Mountain Climb', 'Space Platformer'],
   fighting: ['Street Combat', 'Mortal Arena', 'Tekken Strike', 'Boxing Champion', 'Karate Master', 'Wrestling Showdown', 'Sword Fighter', 'Ninja Battle', 'Samurai Duel', 'Dragon Warrior'],

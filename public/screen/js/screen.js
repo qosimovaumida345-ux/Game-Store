@@ -291,6 +291,8 @@ class ScreenApp {
         
         if (typeof this.gameInstance.start === 'function') {
           this.gameInstance.start();
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
           console.log('=== GAME STARTED ===');
         }
       }

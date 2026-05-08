@@ -4,7 +4,6 @@
 const gameList = [];
 
 const genres = [
-  { id: 'test', name: 'Test', players: { min: 1, max: 4 }, layout: 'single' },
   { id: 'racing', name: 'Racing', players: { min: 1, max: 8 }, layout: 'racing' },
   { id: 'platformer', name: 'Platformer', players: { min: 1, max: 4 }, layout: 'split' },
   { id: 'fighting', name: 'Fighting', players: { min: 2, max: 4 }, layout: 'split' },
@@ -58,7 +57,6 @@ const genres = [
 ];
 
 const gameNames = {
-  test: ['Simple Test', 'Moving Ball', 'Basic Draw', 'Hello World', 'Canvas Test', 'Draw Test', 'Game Test', 'Render Test', 'Screen Test', 'Display Test'],
   racing: [
   racing: ['Formula 1 Pro', 'Rally Championship', 'Drag Racing', 'NASCAR Legends', 'Drift Kings', 'Off-Road Warriors', 'Monster Truck Mania', 'MotoGP Racer', 'Boat Racing Pro', 'Space Velocity'],
   platformer: ['Super Jump Adventure', 'Sky Runner', 'Ice Climber', 'Desert Runner', 'Forest Quest', 'Cave Explorer', 'City Parkour', 'Beach Dash', 'Mountain Climb', 'Space Platformer'],

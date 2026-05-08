@@ -1,5 +1,5 @@
-// Side-Scrolling Shooter Game
-class SideScrollShooterGame {
+// Sniper Elite - Sniper Shooting Game
+class SniperEliteGame {
   constructor(canvas, players, gameId) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -7,27 +7,67 @@ class SideScrollShooterGame {
     this.gameId = gameId;
     this.isRunning = false;
     this.lastTime = 0;
-    
+    this.mousePos = { x: 0, y: 0 };
+    this.mouseDown = false;
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
+    
+    this.canvas.addEventListener('mousemove', e => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mousePos.x = e.clientX - rect.left;
+      this.mousePos.y = e.clientY - rect.top;
+    });
+    
+    this.canvas.addEventListener('mousedown', () => this.mouseDown = true);
+    this.canvas.addEventListener('mouseup', () => this.mouseDown = false);
+    this.canvas.addEventListener('click', () => this.shoot());
+    this.canvas.addEventListener('contextmenu', e => e.preventDefault());
     
     this.gameState = {
       time: 0,
       score: 0,
-      health: 100,
-      weaponLevel: 1,
+      highScore: parseInt(localStorage.getItem('sniperEliteHighScore')) || 0,
+      level: 1,
+      lives: 3,
       status: 'playing',
       player: null,
-      projectiles: [],
+      targets: [],
+      bullets: [],
+      shells: [],
+      wind: 0,
+      windDirection: 1,
+      windTimer: 0,
+      zoom: 1,
+      isZoomed: false,
+      scopePosition: { x: 0, y: 0 },
+      heartRate: 60,
+      breathControl: false,
+      breathHeld: false,
+      breathMeter: 100,
+      recoil: 0,
+      stability: 100,
+      missions: [],
+      currentMission: null,
+      missionObjectives: [],
       enemies: [],
-      powerups: [],
-      particles: [],
-      boss: null,
-      distance: 0,
-      gameOver: false
+      civilians: [],
+      vehicles: [],
+      coverObjects: [],
+      lastShotTime: 0,
+      shotStreak: 0,
+      longestStreak: 0,
+      headshots: 0,
+      bodyShots: 0,
+      totalShots: 0,
+      accuracy: 100,
+      ammo: { rifle: 10, pistol: 6, grenade: 2 },
+      currentWeapon: 'rifle',
+      dayTime: 0.5,
+      fogLevel: 0,
+      difficulty: 'normal'
     };
     
-    this.initGame();
+    this.initLevel();
   }
   
   resizeCanvas() {
@@ -35,507 +75,1036 @@ class SideScrollShooterGame {
     this.canvas.height = this.canvas.parentElement.clientHeight || 600;
   }
   
-  initGame() {
-    this.gameState.player = {
-      x: 150,
-      y: this.canvas.height / 2,
-      width: 40,
-      height: 30,
-      vx: 0,
-      vy: 0,
-      speed: 5,
-      health: 100,
-      maxHealth: 100,
-      invulnerable: 0,
-      shooting: false,
-      shootCooldown: 0
+  initLevel() {
+    this.gameState.missions = [
+      { name: 'Eliminate Target', targets: 5, time: 60, type: 'elimination' },
+      { name: 'Headshot Challenge', targets: 10, time: 90, type: 'headshots' },
+      { name: 'Time Trial', targets: 15, time: 120, type: 'speed' },
+      { name: 'Long Range', distance: 500, targets: 8, type: 'range' },
+      { name: 'Stealth Mission', targets: 6, time: 120, type: 'stealth' },
+      { name: 'Vehicle Destroyer', targets: 5, time: 90, type: 'vehicles' }
+    ];
+    
+    this.gameState.currentMission = this.gameState.missions[0];
+    this.gameState.missionObjectives = this.gameState.currentMission.targets ? 
+      Array(this.gameState.currentMission.targets).fill({ completed: false }) : [];
+    
+    this.generateLevel();
+  }
+  
+  generateLevel() {
+    this.gameState.targets = [];
+    this.gameState.enemies = [];
+    this.gameState.civilians = [];
+    this.gameState.vehicles = [];
+    this.gameState.coverObjects = [];
+    
+    for (let i = 0; i < 8; i++) {
+      this.spawnTarget();
+    }
+    
+    for (let i = 0; i < 3; i++) {
+      this.spawnEnemy();
+    }
+    
+    for (let i = 0; i < 2; i++) {
+      this.spawnCivilian();
+    }
+    
+    for (let i = 0; i < 2; i++) {
+      this.spawnVehicle();
+    }
+    
+    for (let i = 0; i < 10; i++) {
+      this.gameState.coverObjects.push({
+        x: Math.random() * this.canvas.width,
+        y: 100 + Math.random() * (this.canvas.height - 200),
+        width: 30 + Math.random() * 50,
+        height: 30 + Math.random() * 40,
+        type: ['wall', 'crate', 'barrel'][Math.floor(Math.random() * 3)]
+      });
+    }
+  }
+  
+  spawnTarget() {
+    const target = {
+      x: 100 + Math.random() * (this.canvas.width - 200),
+      y: 50 + Math.random() * (this.canvas.height - 150),
+      width: 20,
+      height: 40,
+      type: 'target',
+      health: 1,
+      alive: true,
+      stationary: Math.random() > 0.3,
+      moving: Math.random() > 0.5,
+      moveDirection: Math.random() > 0.5 ? 1 : -1,
+      moveSpeed: 0.5 + Math.random() * 1.5,
+      moveRange: 50 + Math.random() * 100,
+      startX: 0,
+      crouching: Math.random() > 0.7,
+      visible: true,
+      rank: ['private', 'corporal', 'sergeant', 'officer'][Math.floor(Math.random() * 4)],
+      points: 100 + Math.floor(Math.random() * 400)
     };
+    
+    target.startX = target.x;
+    this.gameState.targets.push(target);
   }
   
   spawnEnemy() {
-    const type = Math.random() > 0.8 ? 'heavy' : 'normal';
+    const enemy = {
+      x: Math.random() * this.canvas.width,
+      y: 50 + Math.random() * 300,
+      width: 25,
+      height: 45,
+      type: 'enemy',
+      health: 1,
+      alive: true,
+      alert: false,
+      patrol: Math.random() > 0.5,
+      patrolStart: 0,
+      patrolEnd: 0,
+      patrolDirection: 1,
+      scanning: false,
+      scanningAngle: 0
+    };
     
-    this.gameState.enemies.push({
-      x: this.canvas.width + 30,
-      y: 50 + Math.random() * (this.canvas.height - 100),
-      width: type === 'heavy' ? 50 : 35,
-      height: type === 'heavy' ? 40 : 30,
-      speed: 2 + Math.random() * 2,
-      health: type === 'heavy' ? 40 : 15,
-      maxHealth: type === 'heavy' ? 40 : 15,
-      type: type,
-      shootTimer: Math.random() * 2,
-      angle: 0
-    });
+    enemy.patrolStart = enemy.x - 100;
+    enemy.patrolEnd = enemy.x + 100;
+    this.gameState.enemies.push(enemy);
   }
   
-  spawnBoss() {
-    this.gameState.boss = {
-      x: this.canvas.width + 100,
-      y: this.canvas.height / 2,
-      width: 100,
-      height: 80,
-      speed: 1.5,
-      health: 300,
-      maxHealth: 300,
-      phase: 1,
-      shootTimer: 0,
-      type: 'boss'
+  spawnCivilian() {
+    const civilian = {
+      x: Math.random() * this.canvas.width,
+      y: 200 + Math.random() * 300,
+      width: 20,
+      height: 45,
+      type: 'civilian',
+      health: 1,
+      alive: true,
+      moving: Math.random() > 0.5,
+      direction: Math.random() > 0.5 ? 1 : -1,
+      speed: 0.5
     };
+    
+    this.gameState.civilians.push(civilian);
+  }
+  
+  spawnVehicle() {
+    const vehicle = {
+      x: Math.random() * this.canvas.width,
+      y: 150 + Math.random() * 300,
+      width: 60,
+      height: 40,
+      type: 'vehicle',
+      health: 3,
+      alive: true,
+      moving: Math.random() > 0.5,
+      direction: Math.random() > 0.5 ? 1 : -1,
+      speed: 1,
+      vehicleType: ['jeep', 'truck', 'tank'][Math.floor(Math.random() * 3)]
+    };
+    
+    this.gameState.vehicles.push(vehicle);
   }
   
   start() {
+    const playerName = this.players[0] || 'Sniper';
+    this.gameState.player = {
+      x: this.canvas.width / 2,
+      y: this.canvas.height - 50,
+      width: 30,
+      height: 30,
+      angle: -Math.PI / 2,
+      stability: 100,
+      breathControl: true,
+      steady: false,
+      heartbeat: 60,
+      aimSpeed: 3
+    };
+    
     this.isRunning = true;
     this.lastTime = performance.now();
-    this.enemyTimer = 0;
-    this.gameLoop(this.lastTime);
+    this.gameLoop();
   }
   
-  stop() { this.isRunning = false; }
-  
-  gameLoop(currentTime) {
+  gameLoop() {
     if (!this.isRunning) return;
-    const deltaTime = (currentTime - this.lastTime) / 1000;
+    
+    const currentTime = performance.now();
+    const deltaTime = Math.min(currentTime - this.lastTime, 50);
     this.lastTime = currentTime;
+    
     this.update(deltaTime);
     this.render();
-    requestAnimationFrame((time) => this.gameLoop(time));
+    
+    requestAnimationFrame(() => this.gameLoop());
   }
   
   update(deltaTime) {
-    if (this.gameState.gameOver) return;
+    if (this.gameState.status !== 'playing') return;
     
     this.gameState.time += deltaTime;
-    this.gameState.distance += deltaTime * 100;
     
+    this.updateWind(deltaTime);
     this.updatePlayer(deltaTime);
-    this.updateProjectiles(deltaTime);
+    this.updateTargets(deltaTime);
     this.updateEnemies(deltaTime);
-    this.updateBoss(deltaTime);
+    this.updateCivilians(deltaTime);
+    this.updateVehicles(deltaTime);
+    this.updateBullets(deltaTime);
+    this.updateShells(deltaTime);
+    this.updateBreath(deltaTime);
+    this.updateMission(deltaTime);
     this.checkCollisions();
-    this.spawnEnemies();
-    this.updateParticles(deltaTime);
+  }
+  
+  updateWind(deltaTime) {
+    this.gameState.windTimer += deltaTime;
+    
+    if (this.gameState.windTimer > 3000) {
+      this.gameState.wind = (Math.random() - 0.5) * 10;
+      this.gameState.windDirection = this.gameState.wind > 0 ? 1 : -1;
+      this.gameState.windTimer = 0;
+    }
   }
   
   updatePlayer(deltaTime) {
-    const input = this.getPlayerInput(this.players[0]);
     const player = this.gameState.player;
+    if (!player) return;
     
-    if (input.left) player.vy -= player.speed * 2;
-    if (input.right) player.vy += player.speed * 2;
-    if (input.up) player.vy -= player.speed * 2;
-    if (input.down) player.vy += player.speed * 2;
+    const worldMouseX = (this.mousePos.x - this.canvas.width / 2) / this.gameState.zoom + this.canvas.width / 2;
+    const worldMouseY = (this.mousePos.y - this.canvas.height / 2) / this.gameState.zoom + this.canvas.height / 2;
     
-    player.vy *= 0.9;
-    player.y += player.vy;
+    player.angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
     
-    player.y = Math.max(30, Math.min(this.canvas.height - 30, player.y));
-    
-    if (player.invulnerable > 0) player.invulnerable -= deltaTime;
-    if (player.shootCooldown > 0) player.shootCooldown -= deltaTime;
-    
-    player.shooting = input.action || input.a;
-    
-    if (player.shooting && player.shootCooldown <= 0) {
-      this.fireProjectile();
+    if (this.mouseDown) {
+      player.steady = true;
+      player.aimSpeed = 1;
+    } else {
+      player.steady = false;
+      player.aimSpeed = 3;
     }
+    
+    if (this.keys['ShiftLeft']) {
+      this.gameState.breathHeld = true;
+    } else {
+      this.gameState.breathHeld = false;
+    }
+    
+    if (this.keys['Space']) {
+      this.gameState.isZoomed = !this.gameState.isZoomed;
+      this.gameState.zoom = this.gameState.isZoomed ? 4 : 1;
+      this.keys['Space'] = false;
+    }
+    
+    if (this.keys['KeyQ']) {
+      this.gameState.currentWeapon = this.gameState.currentWeapon === 'rifle' ? 'pistol' : 'rifle';
+      this.keys['KeyQ'] = false;
+    }
+    
+    player.heartbeat = 60 + Math.sin(this.gameState.time / 500) * 10 + (this.gameState.breathHeld ? 20 : 0);
+    this.gameState.heartRate = player.heartbeat;
+    
+    const movement = this.mouseDown ? 0.2 : 1;
+    this.gameState.recoil = Math.max(0, this.gameState.recoil - deltaTime * 0.1);
   }
   
-  fireProjectile() {
+  shoot() {
     const player = this.gameState.player;
-    const level = this.gameState.weaponLevel;
+    if (!player) return;
     
-    player.shootCooldown = level === 1 ? 0.2 : (level === 2 ? 0.15 : 0.1);
+    if (this.gameState.ammo.rifle <= 0 && this.gameState.currentWeapon === 'rifle') {
+      return;
+    }
     
-    this.gameState.projectiles.push({
-      x: player.x + 20,
-      y: player.y,
-      vx: 12,
-      vy: 0,
-      width: 15,
-      height: 4,
-      damage: 10 * level,
-      player: true
-    });
+    this.gameState.totalShots++;
     
-    if (level >= 2) {
-      this.gameState.projectiles.push({
-        x: player.x + 20,
+    if (this.gameState.currentWeapon === 'rifle') {
+      this.gameState.ammo.rifle--;
+    } else {
+      this.gameState.ammo.pistol--;
+    }
+    
+    const stability = this.calculateStability();
+    const spread = (100 - stability) / 500;
+    
+    const windEffect = this.gameState.wind * 0.05;
+    
+    const aimX = this.mousePos.x + (Math.random() - 0.5) * spread * 100 + windEffect;
+    const aimY = this.mousePos.y + (Math.random() - 0.5) * spread * 100;
+    
+    const bullet = {
+      x: player.x,
+      y: player.y - 20,
+      vx: Math.cos(player.angle) * 30,
+      vy: Math.sin(player.angle) * 30,
+      endX: aimX,
+      endY: aimY,
+      damage: this.gameState.currentWeapon === 'rifle' ? 100 : 50,
+      type: this.gameState.currentWeapon,
+      distance: Math.sqrt(Math.pow(aimX - player.x, 2) + Math.pow(aimY - player.y, 2)),
+      windAffected: Math.abs(this.gameState.wind) > 5
+    };
+    
+    this.gameState.bullets.push(bullet);
+    this.gameState.recoil = 20;
+    this.gameState.lastShotTime = this.gameState.time;
+    this.gameState.shotStreak = 0;
+    
+    for (let i = 0; i < 3; i++) {
+      this.gameState.shells.push({
+        x: player.x,
         y: player.y - 10,
-        vx: 12,
-        vy: -2,
-        width: 12,
-        height: 3,
-        damage: 8,
-        player: true
-      });
-      this.gameState.projectiles.push({
-        x: player.x + 20,
-        y: player.y + 10,
-        vx: 12,
-        vy: 2,
-        width: 12,
-        height: 3,
-        damage: 8,
-        player: true
+        vx: (Math.random() - 0.5) * 5,
+        vy: -Math.random() * 3 - 2,
+        rotation: 0,
+        rotationSpeed: (Math.random() - 0.5) * 0.3
       });
     }
-  }
-  
-  updateProjectiles(deltaTime) {
-    this.gameState.projectiles = this.gameState.projectiles.filter(proj => {
-      proj.x += proj.vx;
-      proj.y += proj.vy;
-      
-      return proj.x > -20 && proj.x < this.canvas.width + 20 && proj.y > 0 && proj.y < this.canvas.height;
-    });
-  }
-  
-  spawnEnemies() {
-    this.enemyTimer += 0.016;
     
-    if (this.enemyTimer > 1.5) {
-      this.enemyTimer = 0;
-      this.spawnEnemy();
+    this.playSound('shoot');
+  }
+  
+  calculateStability() {
+    let stability = 100;
+    
+    if (this.mouseDown) stability += 20;
+    if (this.gameState.breathHeld) stability += 30;
+    if (this.gameState.isZoomed) stability += 40;
+    
+    stability -= this.gameState.recoil;
+    stability = Math.max(0, Math.min(100, stability));
+    
+    return stability;
+  }
+  
+  updateTargets(deltaTime) {
+    this.gameState.targets.forEach(target => {
+      if (!target.alive) return;
       
-      if (this.gameState.distance > 2000 && !this.gameState.boss) {
-        this.spawnBoss();
+      if (target.moving && !target.stationary) {
+        target.x += target.moveDirection * target.moveSpeed;
+        
+        if (target.x > target.startX + target.moveRange || target.x < target.startX - target.moveRange) {
+          target.moveDirection *= -1;
+        }
       }
-    }
+      
+      if (target.crouching && Math.random() < 0.01) {
+        target.crouching = false;
+        setTimeout(() => target.crouching = true, 2000 + Math.random() * 3000);
+      }
+    });
   }
   
   updateEnemies(deltaTime) {
-    const player = this.gameState.player;
-    
     this.gameState.enemies.forEach(enemy => {
-      enemy.x -= enemy.speed;
+      if (!enemy.alive) return;
       
-      enemy.shootTimer -= deltaTime;
-      if (enemy.shootTimer <= 0) {
-        enemy.shootTimer = 1.5 + Math.random();
+      if (enemy.patrol) {
+        enemy.x += enemy.patrolDirection * 1;
         
-        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        
-        this.gameState.projectiles.push({
-          x: enemy.x,
-          y: enemy.y,
-          vx: Math.cos(angle) * 5,
-          vy: Math.sin(angle) * 5,
-          width: 8,
-          height: 8,
-          damage: 10,
-          player: false
-        });
+        if (enemy.x > enemy.patrolEnd || enemy.x < enemy.patrolStart) {
+          enemy.patrolDirection *= -1;
+        }
+      }
+      
+      if (enemy.scanning) {
+        enemy.scanningAngle += 0.02;
+      }
+    });
+  }
+  
+  updateCivilians(deltaTime) {
+    this.gameState.civilians.forEach(civilian => {
+      if (!civilian.alive || !civilian.moving) return;
+      
+      civilian.x += civilian.direction * civilian.speed;
+      
+      if (civilian.x < 0 || civilian.x > this.canvas.width) {
+        civilian.direction *= -1;
+      }
+    });
+  }
+  
+  updateVehicles(deltaTime) {
+    this.gameState.vehicles.forEach(vehicle => {
+      if (!vehicle.alive || !vehicle.moving) return;
+      
+      vehicle.x += vehicle.direction * vehicle.speed;
+      
+      if (vehicle.x < -50 || vehicle.x > this.canvas.width + 50) {
+        vehicle.moving = false;
+      }
+    });
+  }
+  
+  updateBullets(deltaTime) {
+    this.gameState.bullets.forEach(bullet => {
+      bullet.active = true;
+    });
+    
+    this.gameState.bullets = this.gameState.bullets.filter(b => b.active);
+  }
+  
+  updateShells(deltaTime) {
+    this.gameState.shells.forEach(shell => {
+      shell.x += shell.vx;
+      shell.y += shell.vy;
+      shell.vy += 0.2;
+      shell.rotation += shell.rotationSpeed;
+      
+      if (shell.y > this.canvas.height) {
+        shell.active = false;
       }
     });
     
-    this.gameState.enemies = this.gameState.enemies.filter(e => e.x > -50 && e.health > 0);
+    this.gameState.shells = this.gameState.shells.filter(s => s.active !== false);
   }
   
-  updateBoss(deltaTime) {
-    if (!this.gameState.boss) return;
-    
-    const boss = this.gameState.boss;
-    
-    if (boss.x > this.canvas.width - 150) {
-      boss.x -= 1;
+  updateBreath(deltaTime) {
+    if (this.gameState.breathHeld) {
+      this.gameState.breathMeter = Math.max(0, this.gameState.breathMeter - deltaTime * 0.1);
     } else {
-      boss.y += Math.sin(this.gameState.time * 2) * 2;
-      boss.y = Math.max(100, Math.min(this.canvas.height - 100, boss.y));
+      this.gameState.breathMeter = Math.min(100, this.gameState.breathMeter + deltaTime * 0.05);
     }
-    
-    boss.shootTimer -= deltaTime;
-    
-    if (boss.shootTimer <= 0) {
-      boss.shootTimer = 0.5;
-      
-      for (let i = -2; i <= 2; i++) {
-        this.gameState.projectiles.push({
-          x: boss.x,
-          y: boss.y,
-          vx: -6,
-          vy: i * 2,
-          width: 10,
-          height: 10,
-          damage: 15,
-          player: false
-        });
+  }
+  
+  updateMission(deltaTime) {
+    if (this.gameState.currentMission.type === 'elimination' || 
+        this.gameState.currentMission.type === 'headshots' ||
+        this.gameState.currentMission.type === 'speed') {
+      const targetsLeft = this.gameState.targets.filter(t => t.alive).length;
+      if (targetsLeft === 0) {
+        this.completeMission();
       }
     }
+  }
+  
+  completeMission() {
+    this.gameState.score += 1000 * this.gameState.level;
+    this.gameState.level++;
+    
+    const nextIndex = this.gameState.level % this.gameState.missions.length;
+    this.gameState.currentMission = this.gameState.missions[nextIndex];
+    
+    if (this.gameState.currentMission.targets) {
+      this.gameState.missionObjectives = Array(this.gameState.currentMission.targets).fill({ completed: false });
+    }
+    
+    this.gameState.ammo.rifle += 5;
+    this.gameState.ammo.pistol += 3;
+    
+    this.generateLevel();
+    
+    this.playSound('missionComplete');
   }
   
   checkCollisions() {
-    const player = this.gameState.player;
-    
-    this.gameState.projectiles.forEach(proj => {
-      if (proj.player) {
-        this.gameState.enemies.forEach(enemy => {
-          if (this.checkCollision(proj, enemy)) {
-            enemy.health -= proj.damage;
-            this.createParticles(enemy.x, enemy.y, '#e74c3c', 5);
-            
-            if (enemy.health <= 0) {
-              this.gameState.score += enemy.type === 'heavy' ? 50 : 20;
-              this.createParticles(enemy.x, enemy.y, '#f1c40f', 15);
-            }
-          }
-        });
+    this.gameState.bullets.forEach(bullet => {
+      if (!bullet.active) return;
+      
+      this.gameState.targets.forEach(target => {
+        if (!target.alive) return;
         
-        if (this.gameState.boss && this.checkCollision(proj, this.gameState.boss)) {
-          this.gameState.boss.health -= proj.damage;
-          this.createParticles(this.gameState.boss.x, this.gameState.boss.y, '#9b59b6', 5);
+        const crouchFactor = target.crouching ? 0.7 : 1;
+        
+        if (this.checkPointInRect(bullet.endX, bullet.endY, 
+            target.x - target.width / 2, target.y - target.height / 2 * crouchFactor,
+            target.width, target.height * crouchFactor)) {
+          bullet.active = false;
+          target.alive = false;
           
-          if (this.gameState.boss.health <= 0) {
-            this.gameState.score += 500;
-            this.gameState.gameOver = true;
-            this.createParticles(this.gameState.boss.x, this.gameState.boss.y, '#9b59b6', 30);
+          const isHeadshot = bullet.endY < target.y - target.height / 2 * crouchFactor + 10;
+          
+          if (isHeadshot) {
+            this.gameState.headshots++;
+            this.gameState.score += target.points * 2;
+            this.gameState.shotStreak++;
+          } else {
+            this.gameState.bodyShots++;
+            this.gameState.score += target.points;
+            this.gameState.shotStreak++;
+          }
+          
+          if (this.gameState.shotStreak > this.gameState.longestStreak) {
+            this.gameState.longestStreak = this.gameState.shotStreak;
+          }
+          
+          this.updateAccuracy();
+          this.createHitEffect(bullet.endX, bullet.endY, isHeadshot);
+        }
+      });
+      
+      this.gameState.enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        
+        if (this.checkPointInRect(bullet.endX, bullet.endY,
+            enemy.x - enemy.width / 2, enemy.y - enemy.height / 2,
+            enemy.width, enemy.height)) {
+          bullet.active = false;
+          enemy.alive = false;
+          this.gameState.score += 150;
+          this.createHitEffect(bullet.endX, bullet.endY, false);
+        }
+      });
+      
+      this.gameState.civilians.forEach(civilian => {
+        if (!civilian.alive) return;
+        
+        if (this.checkPointInRect(bullet.endX, bullet.endY,
+            civilian.x - civilian.width / 2, civilian.y - civilian.height / 2,
+            civilian.width, civilian.height)) {
+          bullet.active = false;
+          civilian.alive = false;
+          this.gameState.score -= 500;
+          this.gameState.lives--;
+          
+          if (this.gameState.lives <= 0) {
+            this.gameOver();
           }
         }
-      } else if (player.invulnerable <= 0 && this.checkCollision(proj, player)) {
-        this.hitPlayer();
-      }
-    });
-    
-    this.gameState.enemies = this.gameState.enemies.filter(e => e.health > 0);
-    
-    this.gameState.enemies.forEach(enemy => {
-      if (player.invulnerable <= 0 && this.checkCollision(player, enemy)) {
-        this.hitPlayer();
-      }
+      });
+      
+      this.gameState.vehicles.forEach(vehicle => {
+        if (!vehicle.alive) return;
+        
+        if (this.checkPointInRect(bullet.endX, bullet.endY,
+            vehicle.x - vehicle.width / 2, vehicle.y - vehicle.height / 2,
+            vehicle.width, vehicle.height)) {
+          bullet.active = false;
+          vehicle.health--;
+          
+          if (vehicle.health <= 0) {
+            vehicle.alive = false;
+            this.gameState.score += 300;
+          }
+        }
+      });
+      
+      this.gameState.coverObjects.forEach(cover => {
+        if (this.checkPointInRect(bullet.endX, bullet.endY,
+            cover.x - cover.width / 2, cover.y - cover.height / 2,
+            cover.width, cover.height)) {
+          bullet.active = false;
+        }
+      });
     });
   }
   
-  checkCollision(a, b) {
-    return a.x - a.width/2 < b.x + b.width/2 &&
-           a.x + a.width/2 > b.x - b.width/2 &&
-           a.y - a.height/2 < b.y + b.height/2 &&
-           a.y + a.height/2 > b.y - b.height/2;
+  checkPointInRect(px, py, rx, ry, rw, rh) {
+    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
   }
   
-  hitPlayer() {
-    const player = this.gameState.player;
-    
-    player.health -= 20;
-    player.invulnerable = 1;
-    this.createParticles(player.x, player.y, '#e74c3c', 15);
-    
-    if (player.health <= 0) {
-      this.gameState.gameOver = true;
+  updateAccuracy() {
+    if (this.gameState.totalShots > 0) {
+      const hits = this.gameState.headshots + this.gameState.bodyShots;
+      this.gameState.accuracy = Math.round((hits / this.gameState.totalShots) * 100);
     }
   }
   
-  createParticles(x, y, color, count) {
-    for (let i = 0; i < count; i++) {
+  createHitEffect(x, y, isHeadshot) {
+    this.gameState.particles = this.gameState.particles || [];
+    
+    for (let i = 0; i < 8; i++) {
       this.gameState.particles.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 8,
-        vy: (Math.random() - 0.5) * 8,
-        life: 1,
-        color,
-        size: 3 + Math.random() * 4
+        x: x,
+        y: y,
+        vx: (Math.random() - 0.5) * 5,
+        vy: (Math.random() - 0.5) * 5,
+        color: isHeadshot ? '#ff0000' : '#880000',
+        size: 3,
+        lifetime: 300
+      });
+    }
+    
+    if (isHeadshot) {
+      this.gameState.particles.push({
+        x: x,
+        y: y - 20,
+        text: 'HEADSHOT!',
+        color: '#ffff00',
+        lifetime: 500
       });
     }
   }
   
-  updateParticles(deltaTime) {
-    this.gameState.particles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= deltaTime * 2;
-    });
-    this.gameState.particles = this.gameState.particles.filter(p => p.life > 0);
-  }
-  
-  getPlayerInput(playerName) {
-    return window.gameState && window.gameState[playerName] ? window.gameState[playerName].input || {} : {};
-  }
-  
-  render() {
-    this.drawBackground();
-    this.drawStars();
-    this.drawProjectiles();
-    this.drawEnemies();
-    this.drawBoss();
-    this.drawPlayer();
-    this.drawParticles();
-    this.drawUI();
-    if (this.gameState.gameOver) this.drawGameOver();
-  }
-  
-  drawBackground() {
-    const gradient = this.ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
-    gradient.addColorStop(0, '#0a0a20');
-    gradient.addColorStop(1, '#1a1a40');
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  }
-  
-  drawStars() {
-    this.ctx.fillStyle = '#fff';
-    for (let i = 0; i < 30; i++) {
-      const x = (i * 97 + this.gameState.distance * 0.2) % this.canvas.width;
-      const y = (i * 53) % this.canvas.height;
-      const size = (i % 3) + 1;
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, size, 0, Math.PI * 2);
-      this.ctx.fill();
+  playSound(type) {
+    if (typeof AudioContext !== 'undefined') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        const frequencies = {
+          shoot: 200,
+          missionComplete: 800
+        };
+        
+        oscillator.frequency.value = frequencies[type] || 440;
+        oscillator.type = 'square';
+        gainNode.gain.value = 0.05;
+        
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        oscillator.stop(audioCtx.currentTime + 0.15);
+      } catch (e) {}
     }
   }
   
-  drawPlayer() {
-    const player = this.gameState.player;
+  gameOver() {
+    this.gameState.status = 'gameover';
+    this.isRunning = false;
     
-    if (player.invulnerable > 0 && Math.floor(this.gameState.time * 15) % 2 === 0) return;
-    
-    this.ctx.save();
-    this.ctx.translate(player.x, player.y);
-    
-    this.ctx.fillStyle = '#3498db';
-    this.ctx.beginPath();
-    this.ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = '#2980b9';
-    this.ctx.beginPath();
-    this.ctx.moveTo(-20, 0);
-    this.ctx.lineTo(-30, -8);
-    this.ctx.lineTo(-30, 8);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = '#f39c12';
-    this.ctx.beginPath();
-    this.ctx.arc(12, -3, 6, 0, Math.PI * 2);
-    this.ctx.arc(12, 3, 6, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    this.ctx.restore();
+    if (this.gameState.score > this.gameState.highScore) {
+      this.gameState.highScore = this.gameState.score;
+      localStorage.setItem('sniperEliteHighScore', this.gameState.highScore);
+    }
   }
   
-  drawEnemies() {
+  render() {
+    const ctx = this.ctx;
+    
+    const dayColor = `rgb(${50 + this.gameState.dayTime * 100}, ${80 + this.gameState.dayTime * 80}, ${120 + this.gameState.dayTime * 100})`;
+    ctx.fillStyle = dayColor;
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.renderBackground();
+    this.renderCoverObjects();
+    this.renderCivilians();
+    this.renderTargets();
+    this.renderEnemies();
+    this.renderVehicles();
+    this.renderPlayer();
+    this.renderShells();
+    this.renderBullets();
+    this.renderParticles();
+    
+    if (this.gameState.isZoomed) {
+      this.renderScope();
+    }
+    
+    this.renderUI();
+  }
+  
+  renderBackground() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = '#445544';
+    for (let i = 0; i < 5; i++) {
+      const x = (i * 200 + this.gameState.wind * this.gameState.time * 0.01) % (this.canvas.width + 200) - 100;
+      ctx.beginPath();
+      ctx.moveTo(x, 150 + i * 30);
+      ctx.lineTo(x + 100, 180 + i * 30);
+      ctx.lineTo(x + 50, 250);
+      ctx.fill();
+    }
+    
+    ctx.fillStyle = '#556655';
+    ctx.fillRect(0, this.canvas.height - 100, this.canvas.width, 100);
+  }
+  
+  renderCoverObjects() {
+    const ctx = this.ctx;
+    
+    this.gameState.coverObjects.forEach(cover => {
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(cover.x - cover.width / 2, cover.y - cover.height / 2, cover.width, cover.height);
+      
+      ctx.fillStyle = '#555555';
+      if (cover.type === 'crate') {
+        ctx.fillRect(cover.x - cover.width / 2 + 5, cover.y - cover.height / 2 + 5, cover.width - 10, cover.height - 10);
+      } else if (cover.type === 'barrel') {
+        ctx.beginPath();
+        ctx.arc(cover.x, cover.y, cover.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+  }
+  
+  renderCivilians() {
+    const ctx = this.ctx;
+    
+    this.gameState.civilians.forEach(civilian => {
+      if (!civilian.alive) return;
+      
+      ctx.fillStyle = '#88aaff';
+      ctx.fillRect(civilian.x - civilian.width / 2, civilian.y - civilian.height / 2, civilian.width, civilian.height);
+      
+      ctx.fillStyle = '#ffccaa';
+      ctx.beginPath();
+      ctx.arc(civilian.x, civilian.y - civilian.height / 2 - 5, 8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  renderTargets() {
+    const ctx = this.ctx;
+    
+    this.gameState.targets.forEach(target => {
+      if (!target.alive) return;
+      
+      const crouchFactor = target.crouching ? 0.7 : 1;
+      
+      ctx.fillStyle = '#445544';
+      ctx.fillRect(target.x - target.width / 2, target.y - target.height / 2 * crouchFactor, 
+                   target.width, target.height * crouchFactor);
+      
+      ctx.fillStyle = '#664422';
+      ctx.fillRect(target.x - 5, target.y - target.height / 2 * crouchFactor - 15, 10, 15);
+      
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(target.x - 6, target.y - target.height / 2 * crouchFactor - 12, 4, 4);
+      ctx.fillRect(target.x + 2, target.y - target.height / 2 * crouchFactor - 12, 4, 4);
+      
+      if (target.rank === 'officer') {
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(target.x - target.width / 2, target.y - target.height * crouchFactor - 5, target.width, 3);
+      }
+    });
+  }
+  
+  renderEnemies() {
+    const ctx = this.ctx;
+    
     this.gameState.enemies.forEach(enemy => {
-      this.ctx.save();
-      this.ctx.translate(enemy.x, enemy.y);
+      if (!enemy.alive) return;
       
-      const color = enemy.type === 'heavy' ? '#e74c3c' : '#9b59b6';
-      this.ctx.fillStyle = color;
+      ctx.fillStyle = enemy.alert ? '#aa4444' : '#556644';
+      ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height);
       
-      this.ctx.beginPath();
-      this.ctx.ellipse(0, 0, enemy.width/2, enemy.height/2, 0, 0, Math.PI * 2);
-      this.ctx.fill();
+      ctx.fillStyle = '#665544';
+      ctx.fillRect(enemy.x - 6, enemy.y - enemy.height / 2 - 12, 12, 12);
       
-      this.ctx.fillStyle = '#2c3e50';
-      this.ctx.fillRect(-10, -5, 6, 4);
-      this.ctx.fillRect(4, -5, 6, 4);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(enemy.x - 4, enemy.y - enemy.height / 2 - 10, 3, 3);
+      ctx.fillRect(enemy.x + 1, enemy.y - enemy.height / 2 - 10, 3, 3);
       
-      if (enemy.type === 'heavy') {
-        this.ctx.strokeStyle = '#c0392b';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, enemy.width/2 - 5, 0, Math.PI * 2);
-        this.ctx.stroke();
+      if (enemy.scanning) {
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(enemy.x, enemy.y - 10);
+        ctx.lineTo(enemy.x + Math.cos(enemy.scanningAngle) * 50, 
+                   enemy.y - 10 + Math.sin(enemy.scanningAngle) * 20);
+        ctx.stroke();
+      }
+    });
+  }
+  
+  renderVehicles() {
+    const ctx = this.ctx;
+    
+    this.gameState.vehicles.forEach(vehicle => {
+      if (!vehicle.alive) return;
+      
+      ctx.fillStyle = '#555566';
+      ctx.fillRect(vehicle.x - vehicle.width / 2, vehicle.y - vehicle.height / 2, vehicle.width, vehicle.height);
+      
+      if (vehicle.vehicleType === 'tank') {
+        ctx.fillStyle = '#444455';
+        ctx.fillRect(vehicle.x - 10, vehicle.y - vehicle.height / 2 - 10, 20, 15);
       }
       
-      this.ctx.restore();
+      ctx.fillStyle = '#222233';
+      ctx.fillRect(vehicle.x - vehicle.width / 2 + 5, vehicle.y - vehicle.height / 2 + 5, 20, 15);
+      ctx.fillRect(vehicle.x + vehicle.width / 2 - 25, vehicle.y - vehicle.height / 2 + 5, 20, 15);
     });
   }
   
-  drawBoss() {
-    if (!this.gameState.boss) return;
+  renderPlayer() {
+    const ctx = this.ctx;
+    const player = this.gameState.player;
+    if (!player) return;
     
-    const boss = this.gameState.boss;
+    ctx.save();
+    ctx.translate(player.x, player.y);
     
-    this.ctx.save();
-    this.ctx.translate(boss.x, boss.y);
+    ctx.fillStyle = '#445544';
+    ctx.fillRect(-15, -15, 30, 30);
     
-    this.ctx.fillStyle = '#8e44ad';
-    this.ctx.fillRect(-50, -40, 100, 80);
+    ctx.fillStyle = '#665544';
+    ctx.beginPath();
+    ctx.arc(0, -25, 12, 0, Math.PI * 2);
+    ctx.fill();
     
-    this.ctx.fillStyle = '#9b59b6';
-    this.ctx.fillRect(-40, -30, 80, 60);
+    const weaponX = Math.cos(player.angle) * 20;
+    const weaponY = Math.sin(player.angle) * 20;
     
-    this.ctx.fillStyle = '#e74c3c';
-    this.ctx.beginPath();
-    this.ctx.arc(-20, -10, 15, 0, Math.PI * 2);
-    this.ctx.arc(20, -10, 15, 0, Math.PI * 2);
-    this.ctx.fill();
+    ctx.save();
+    ctx.translate(weaponX, weaponY);
+    ctx.rotate(player.angle);
     
-    this.ctx.fillStyle = '#fff';
-    this.ctx.beginPath();
-    this.ctx.arc(-20, -10, 6, 0, Math.PI * 2);
-    this.ctx.arc(20, -10, 6, 0, Math.PI * 2);
-    this.ctx.fill();
+    ctx.fillStyle = '#333333';
+    if (this.gameState.currentWeapon === 'rifle') {
+      ctx.fillRect(-5, -2, 35, 4);
+      ctx.fillRect(25, -3, 10, 6);
+    } else {
+      ctx.fillRect(-3, -2, 15, 4);
+    }
     
-    this.ctx.fillStyle = '#fff';
-    this.ctx.fillRect(-45, -55, 90, 10);
-    this.ctx.fillStyle = '#e74c3c';
-    this.ctx.fillRect(-45, -55, 90 * (boss.health / boss.maxHealth), 10);
-    
-    this.ctx.restore();
+    ctx.restore();
+    ctx.restore();
   }
   
-  drawProjectiles() {
-    this.gameState.projectiles.forEach(proj => {
-      this.ctx.fillStyle = proj.player ? '#f1c40f' : '#e74c3c';
-      this.ctx.beginPath();
-      this.ctx.ellipse(proj.x, proj.y, proj.width/2, proj.height/2, 0, 0, Math.PI * 2);
-      this.ctx.fill();
+  renderShells() {
+    const ctx = this.ctx;
+    
+    this.gameState.shells.forEach(shell => {
+      ctx.save();
+      ctx.translate(shell.x, shell.y);
+      ctx.rotate(shell.rotation);
+      
+      ctx.fillStyle = '#ccaa66';
+      ctx.fillRect(-3, -2, 6, 4);
+      
+      ctx.restore();
     });
   }
   
-  drawParticles() {
-    this.gameState.particles.forEach(p => {
-      this.ctx.globalAlpha = p.life;
-      this.ctx.fillStyle = p.color;
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      this.ctx.fill();
+  renderBullets() {
+    const ctx = this.ctx;
+    
+    this.gameState.bullets.forEach(bullet => {
+      if (!bullet.active) return;
+      
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bullet.x, bullet.y);
+      ctx.lineTo(bullet.endX, bullet.endY);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(bullet.endX, bullet.endY, 4, 0, Math.PI * 2);
+      ctx.fill();
     });
-    this.ctx.globalAlpha = 1;
   }
   
-  drawUI() {
-    this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    this.ctx.fillRect(10, 10, 130, 60);
+  renderParticles() {
+    const ctx = this.ctx;
+    this.gameState.particles = this.gameState.particles || [];
     
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = 'bold 14px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`Score: ${this.gameState.score}`, 20, 30);
-    this.ctx.fillText(`Dist: ${Math.floor(this.gameState.distance)}m`, 20, 50);
+    this.gameState.particles.forEach(particle => {
+      if (particle.text) {
+        ctx.fillStyle = particle.color;
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = particle.lifetime / 500;
+        ctx.fillText(particle.text, particle.x, particle.y);
+      } else {
+        ctx.fillStyle = particle.color;
+        ctx.globalAlpha = particle.lifetime / 300;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
     
-    this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    this.ctx.fillRect(this.canvas.width - 120, 10, 110, 30);
-    this.ctx.fillStyle = '#333';
-    this.ctx.fillRect(this.canvas.width - 115, 18, 100, 8);
-    this.ctx.fillStyle = player => player.health > 30 ? '#e74c3c' : '#e74c3c';
-    this.ctx.fillRect(this.canvas.width - 115, 18, 100 * (this.gameState.player.health / 100), 8);
-    
-    this.ctx.fillStyle = '#ffd93d';
-    this.ctx.font = 'bold 16px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('SPACE COMBAT', this.canvas.width / 2, 25);
+    ctx.globalAlpha = 1;
   }
   
-  drawGameOver() {
-    this.ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  renderScope() {
+    const ctx = this.ctx;
     
-    this.ctx.fillStyle = this.gameState.boss && this.gameState.boss.health <= 0 ? '#2ecc71' : '#e74c3c';
-    this.ctx.font = 'bold 50px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(this.gameState.boss && this.gameState.boss.health <= 0 ? 'VICTORY!' : 'GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = '30px Arial';
-    this.ctx.fillText(`Final Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
+    ctx.save();
+    ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+    ctx.scale(1 / this.gameState.zoom, 1 / this.gameState.zoom);
+    ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
+    
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.renderBackground();
+    this.renderCoverObjects();
+    this.renderTargets();
+    this.renderEnemies();
+    this.renderVehicles();
+    this.renderCivilians();
+    this.renderPlayer();
+    
+    ctx.restore();
+    
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(this.canvas.width / 2 - 100, this.canvas.height / 2);
+    ctx.lineTo(this.canvas.width / 2 - 20, this.canvas.height / 2);
+    ctx.moveTo(this.canvas.width / 2 + 20, this.canvas.height / 2);
+    ctx.lineTo(this.canvas.width / 2 + 100, this.canvas.height / 2);
+    ctx.moveTo(this.canvas.width / 2, this.canvas.height / 2 - 100);
+    ctx.lineTo(this.canvas.width / 2, this.canvas.height / 2 - 20);
+    ctx.moveTo(this.canvas.width / 2, this.canvas.height / 2 + 20);
+    ctx.lineTo(this.canvas.width / 2, this.canvas.height / 2 + 100);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(this.canvas.width / 2, this.canvas.height / 2, 30, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(this.canvas.width / 2, this.canvas.height / 2, 60, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(this.canvas.width / 2, this.canvas.height / 2, 100, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    const wind = this.gameState.wind;
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Wind: ${Math.abs(wind).toFixed(1)} ${wind > 0 ? 'R' : 'L'}`, 30, 50);
+    
+    const distance = Math.sqrt(Math.pow(this.mousePos.x - this.canvas.width / 2, 2) + 
+                              Math.pow(this.mousePos.y - this.canvas.height / 2, 2));
+    const range = Math.floor(distance * 10);
+    ctx.fillText(`Range: ${range}m`, 30, 70);
+    
+    this.renderScopeUI();
   }
   
-  updatePlayerInput(name, input) {
-    window.gameState = window.gameState || {};
-    window.gameState[name] = { input: input };
+  renderScopeUI() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(20, this.canvas.height - 80, 200, 60);
+    
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Stability: ${Math.floor(this.gameState.stability)}%`, 30, this.canvas.height - 60);
+    
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(30, this.canvas.height - 50, 150, 10);
+    ctx.fillStyle = this.gameState.breathMeter > 30 ? '#00ff00' : '#ff0000';
+    ctx.fillRect(30, this.canvas.height - 50, 150 * (this.gameState.breathMeter / 100), 10);
+    
+    ctx.fillStyle = '#00ff00';
+    ctx.fillText(`Heart Rate: ${this.gameState.heartRate}`, 30, this.canvas.height - 30);
+  }
+  
+  renderUI() {
+    const ctx = this.ctx;
+    
+    if (this.gameState.isZoomed) return;
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${this.gameState.score}`, 20, 30);
+    ctx.fillText(`Level: ${this.gameState.level}`, 20, 55);
+    
+    ctx.textAlign = 'right';
+    ctx.fillText(`High: ${this.gameState.highScore}`, this.canvas.width - 20, 30);
+    ctx.fillText(`Lives: ${this.gameState.lives}`, this.canvas.width - 20, 55);
+    
+    ctx.fillStyle = '#888888';
+    ctx.fillText(`Rifle: ${this.gameState.ammo.rifle}`, 20, 80);
+    ctx.fillText(`Pistol: ${this.gameState.ammo.pistol}`, this.canvas.width - 20, 80);
+    
+    ctx.fillText(`Accuracy: ${this.gameState.accuracy}%`, 20, 105);
+    ctx.fillText(`Headshots: ${this.gameState.headshots}`, this.canvas.width - 20, 105);
+    
+    ctx.fillStyle = '#666666';
+    ctx.fillRect(20, 120, 150, 15);
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(20, 120, 150 * (this.gameState.stability / 100), 15);
+    ctx.fillStyle = '#888888';
+    ctx.fillText('Stability', 20, 150);
+    
+    const wind = this.gameState.wind;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Wind: ${Math.abs(wind).toFixed(1)} ${wind > 0 ? '→' : '←'}`, this.canvas.width / 2, 30);
+    
+    if (this.gameState.currentMission) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(10, 10, 220, 60);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Mission: ${this.gameState.currentMission.name}`, 20, 30);
+      
+      const targetsLeft = this.gameState.targets.filter(t => t.alive).length;
+      ctx.fillText(`Targets: ${targetsLeft}`, 20, 50);
+    }
+    
+    ctx.fillStyle = '#888888';
+    ctx.textAlign = 'left';
+    ctx.fillText('SPACE: Zoom | SHIFT: Hold Breath | Q: Switch Weapon', 20, this.canvas.height - 20);
+    
+    if (this.gameState.status === 'gameover') {
+      this.renderGameOver();
+    }
+  }
+  
+  renderGameOver() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    ctx.fillStyle = '#ff0000';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('MISSION FAILED', this.canvas.width / 2, this.canvas.height / 2 - 60);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Arial';
+    ctx.fillText(`Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2);
+    ctx.fillText(`Accuracy: ${this.gameState.accuracy}%`, this.canvas.width / 2, this.canvas.height / 2 + 40);
+    ctx.fillText(`Headshots: ${this.gameState.headshots}`, this.canvas.width / 2, this.canvas.height / 2 + 80);
+    
+    ctx.fillStyle = '#888888';
+    ctx.font = '18px Arial';
+    ctx.fillText('Click to restart', this.canvas.width / 2, this.canvas.height / 2 + 130);
+  }
+  
+  restart() {
+    this.gameState.time = 0;
+    this.gameState.score = 0;
+    this.gameState.level = 1;
+    this.gameState.lives = 3;
+    this.gameState.status = 'playing';
+    this.gameState.ammo = { rifle: 10, pistol: 6, grenade: 2 };
+    this.gameState.headshots = 0;
+    this.gameState.bodyShots = 0;
+    this.gameState.totalShots = 0;
+    this.gameState.accuracy = 100;
+    this.gameState.shotStreak = 0;
+    this.gameState.longestStreak = 0;
+    this.gameState.currentMission = this.gameState.missions[0];
+    
+    this.generateLevel();
+    this.start();
   }
 }
 
-var player;
+window.SniperEliteGame = SniperEliteGame;
 
-window.SideScrollShooterGame = SideScrollShooterGame;
+window.addEventListener('keydown', function(e) {
+  if (window.sniperEliteGameInstance) {
+    window.sniperEliteGameInstance.keys = window.sniperEliteGameInstance.keys || {};
+    window.sniperEliteGameInstance.keys[e.code] = true;
+  }
+});
+
+window.addEventListener('keyup', function(e) {
+  if (window.sniperEliteGameInstance) {
+    window.sniperEliteGameInstance.keys = window.sniperEliteGameInstance.keys || {};
+    window.sniperEliteGameInstance.keys[e.code] = false;
+  }
+});
+
+window.sniperEliteGameInstance = null;
+window.SniperEliteGame = SniperEliteGame;

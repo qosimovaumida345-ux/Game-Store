@@ -1,5 +1,5 @@
-// Contra Style Run and Gun
-class ContraGame {
+// Target Practice - Aim Training
+class TargetPracticeGame {
   constructor(canvas, players, gameId) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -7,371 +7,915 @@ class ContraGame {
     this.gameId = gameId;
     this.isRunning = false;
     this.lastTime = 0;
-    
+    this.mousePos = { x: 0, y: 0 };
+    this.mouseDown = false;
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
+    
+    this.canvas.addEventListener('mousemove', e => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mousePos.x = e.clientX - rect.left;
+      this.mousePos.y = e.clientY - rect.top;
+    });
+    
+    this.canvas.addEventListener('mousedown', () => {
+      this.mouseDown = true;
+      this.shotsFired++;
+      this.recordShot();
+    });
+    
+    this.canvas.addEventListener('mouseup', () => this.mouseDown = false);
+    this.canvas.addEventListener('click', () => this.handleClick());
     
     this.gameState = {
       time: 0,
       score: 0,
-      lives: 3,
-      player: null,
+      highScore: parseInt(localStorage.getItem('targetPracticeHighScore')) || 0,
+      mode: 'classic',
+      status: 'menu',
+      targets: [],
       bullets: [],
-      enemies: [],
-      platforms: [],
-      direction: 1,
-      canJump: true,
-      crouching: false,
-      invulnerable: 0,
-      status: 'playing',
-      gameOver: false
+      particles: [],
+      hitMarkers: [],
+      crosshair: { x: 400, y: 300 },
+      sessionStats: {
+        shots: 0,
+        hits: 0,
+        accuracy: 0,
+        avgTime: 0,
+        bestTime: Infinity,
+        reactionTimes: [],
+        perfectShots: 0,
+        streak: 0,
+        maxStreak: 0,
+        headshots: 0,
+        totalTargets: 0
+      },
+      settings: {
+        targetSize: 30,
+        spawnRate: 1000,
+        targetLifetime: 3000,
+        showTimer: true,
+        showAccuracy: true,
+        showCrosshair: true,
+        soundEffects: true,
+        difficulty: 'normal',
+        targetTypes: ['circle', 'square', 'triangle', 'moving', 'shrinking']
+      },
+      currentMode: 'classic',
+      modes: [
+        { name: 'Classic', description: 'Hit as many targets as possible', duration: 60 },
+        { name: 'Precision', description: 'Hit targets in the center for more points', duration: 90 },
+        { name: 'Speed', description: 'React and shoot as fast as possible', duration: 45 },
+        { name: 'Survival', description: 'Don\'t let targets expire', duration: 120 },
+        { name: 'Endless', description: 'Practice forever, no time limit', duration: Infinity }
+      ],
+      gameTimer: 0,
+      gameDuration: 60,
+      roundActive: false,
+      targetSpawnTimer: 0,
+      difficulty: 1,
+      combo: 0,
+      multiplier: 1,
+      lastHitTime: 0,
+      perfectZoneRadius: 10
     };
     
-    this.physics = {
-      gravity: 1200,
-      jumpForce: 600,
-      moveSpeed: 250
-    };
-    
-    this.initGame();
+    this.clicks = 0;
   }
   
   resizeCanvas() {
-    this.canvas.width = this.parentElement.clientWidth || 800;
-    this.canvas.height = this.parentElement.clientHeight || 600;
-  }
-  
-  initGame() {
-    this.gameState.player = {
-      x: 100, y: 450,
-      width: 30, height: 50,
-      vx: 0, vy: 0,
-      grounded: true,
-      facingRight: true,
-      state: 'idle'
-    };
-    
-    this.gameState.platforms = [
-      { x: 0, y: 500, width: 200, height: 30 },
-      { x: 250, y: 450, width: 100, height: 20 },
-      { x: 400, y: 400, width: 100, height: 20 },
-      { x: 550, y: 350, width: 100, height: 20 },
-      { x: 700, y: 300, width: 100, height: 20 },
-      { x: 600, y: 500, width: 200, height: 30 }
-    ];
+    this.canvas.width = this.canvas.parentElement.clientWidth || 800;
+    this.canvas.height = this.canvas.parentElement.clientHeight || 600;
+    this.gameState.crosshair = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
   }
   
   start() {
     this.isRunning = true;
     this.lastTime = performance.now();
-    this.gameLoop(this.lastTime);
+    this.gameLoop();
   }
   
-  stop() { this.isRunning = false; }
-  
-  gameLoop(currentTime) {
+  gameLoop() {
     if (!this.isRunning) return;
-    const deltaTime = (currentTime - this.lastTime) / 1000;
+    
+    const currentTime = performance.now();
+    const deltaTime = Math.min(currentTime - this.lastTime, 50);
     this.lastTime = currentTime;
+    
     this.update(deltaTime);
     this.render();
-    requestAnimationFrame((time) => this.gameLoop(time));
+    
+    requestAnimationFrame(() => this.gameLoop());
   }
   
   update(deltaTime) {
-    if (this.gameState.gameOver) return;
     this.gameState.time += deltaTime;
+    this.gameState.crosshair.x = this.mousePos.x;
+    this.gameState.crosshair.y = this.mousePos.y;
     
-    if (this.gameState.invulnerable > 0) this.gameState.invulnerable -= deltaTime;
-    
-    const p = this.gameState.player;
-    const input = this.getPlayerInput(this.players[0]);
-    
-    if (input.left) {
-      p.vx = -this.physics.moveSpeed;
-      p.facingRight = false;
-    } else if (input.right) {
-      p.vx = this.physics.moveSpeed;
-      p.facingRight = true;
-    } else {
-      p.vx = 0;
-    }
-    
-    if (input.jump && p.grounded && this.gameState.canJump) {
-      p.vy = -this.physics.jumpForce;
-      p.grounded = false;
-      this.gameState.canJump = false;
-    }
-    
-    if (input.shoot) {
-      this.fireBullet();
-    }
-    
-    p.vy += this.physics.gravity * deltaTime;
-    
-    p.x += p.vx * deltaTime;
-    this.handleHorizontalCollisions();
-    
-    p.y += p.vy * deltaTime;
-    p.grounded = false;
-    this.handleVerticalCollisions();
-    
-    p.x = Math.max(20, Math.min(780, p.x));
-    
-    if (p.y > 600) {
-      this.gameState.lives--;
-      if (this.gameState.lives <= 0) {
-        this.gameState.gameOver = true;
-      } else {
-        p.x = 100;
-        p.y = 450;
-        p.vx = 0;
-        p.vy = 0;
-        this.gameState.invulnerable = 2;
-      }
-    }
-    
-    this.updateBullets(deltaTime);
-    this.updateEnemies(deltaTime);
-    this.spawnEnemies();
-  }
-  
-  fireBullet() {
-    const p = this.gameState.player;
-    const dir = p.facingRight ? 1 : -1;
-    
-    this.gameState.bullets.push({
-      x: p.x + (dir > 0 ? 30 : 0),
-      y: p.y + (this.gameState.crouching ? 20 : 10),
-      vx: dir * 600,
-      vy: 0,
-      spread: 0,
-      owner: 'player'
-    });
-    
-    if (Math.random() < 0.3) {
-      this.gameState.bullets.push({
-        x: p.x + (dir > 0 ? 30 : 0),
-        y: p.y + 10,
-        vx: dir * 550,
-        vy: dir * 50,
-        spread: 1,
-        owner: 'player'
-      });
-    }
-  }
-  
-  handleHorizontalCollisions() {
-    const p = this.gameState.player;
-    this.gameState.platforms.forEach(plat => {
-      if (this.checkCollision(p, plat)) {
-        if (p.vx > 0) p.x = plat.x - p.width;
-        else if (p.vx < 0) p.x = plat.x + plat.width;
-      }
-    });
-  }
-  
-  handleVerticalCollisions() {
-    const p = this.gameState.player;
-    this.gameState.platforms.forEach(plat => {
-      if (this.checkCollision(p, plat)) {
-        if (p.vy > 0) {
-          p.y = plat.y - p.height;
-          p.vy = 0;
-          p.grounded = true;
-          this.gameState.canJump = true;
-        } else if (p.vy < 0) {
-          p.y = plat.y + plat.height;
-          p.vy = 0;
-        }
-      }
-    });
-  }
-  
-  checkCollision(a, b) {
-    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-  }
-  
-  updateBullets(deltaTime) {
-    this.gameState.bullets = this.gameState.bullets.filter(b => {
-      b.x += b.vx * deltaTime;
-      b.y += b.vy * deltaTime;
+    if (this.gameState.status === 'playing') {
+      this.gameState.gameTimer -= deltaTime / 1000;
       
-      if (b.x < -50 || b.x > 850) return false;
-      
-      if (b.owner === 'player') {
-        this.gameState.enemies.forEach((e, ei) => {
-          if (this.checkCollision({ x: b.x - 3, y: b.y - 3, width: 6, height: 6 }, { x: e.x, y: e.y - 20, width: 30, height: 40 })) {
-            e.hp -= 10;
-            if (e.hp <= 0) {
-              this.gameState.score += e.score || 100;
-              this.gameState.enemies.splice(ei, 1);
-            }
-            return false;
-          }
-        });
-      }
-      
-      return true;
-    });
-  }
-  
-  spawnEnemies() {
-    if (Math.random() < 0.02 && this.gameState.enemies.length < 8) {
-      this.gameState.enemies.push({
-        x: 850,
-        y: 470,
-        vx: -50 - Math.random() * 50,
-        hp: 20,
-        type: 'soldier',
-        state: 'walking',
-        shooting: false,
-        shootTimer: 0,
-        score: 100
-      });
-    }
-  }
-  
-  updateEnemies(deltaTime) {
-    this.gameState.enemies.forEach(e => {
-      e.x += e.vx * deltaTime;
-      
-      if (e.x < -50) {
-        this.gameState.enemies = this.gameState.enemies.filter(en => en !== e);
+      if (this.gameState.gameTimer <= 0 && this.gameState.currentMode !== 'Endless') {
+        this.endGame();
         return;
       }
       
-      if (e.shooting) {
-        e.shootTimer += deltaTime;
-        if (e.shootTimer > 0.5) {
-          e.shooting = false;
-          e.shootTimer = 0;
-        }
-      } else if (Math.random() < 0.02) {
-        e.shooting = true;
-        this.gameState.bullets.push({
-          x: e.x,
-          y: e.y - 15,
-          vx: -200 - Math.random() * 100,
-          vy: (Math.random() - 0.5) * 50,
-          spread: 0,
-          owner: 'enemy'
-        });
+      this.updateTargets(deltaTime);
+      this.updateBullets(deltaTime);
+      this.updateParticles(deltaTime);
+      this.updateHitMarkers(deltaTime);
+      this.spawnTarget();
+      this.calculateStats();
+    }
+  }
+  
+  spawnTarget() {
+    const spawnRate = this.getSpawnRate();
+    
+    if (this.gameState.targets.length < 10 && 
+        this.gameState.time - this.gameState.targetSpawnTimer > spawnRate) {
+      
+      const target = this.createTarget();
+      this.gameState.targets.push(target);
+      this.gameState.targetSpawnTimer = this.gameState.time;
+      this.gameState.sessionStats.totalTargets++;
+    }
+  }
+  
+  getSpawnRate() {
+    const baseRate = this.gameState.settings.spawnRate;
+    const difficultyMod = {
+      easy: 1.5,
+      normal: 1,
+      hard: 0.7,
+      expert: 0.5
+    };
+    
+    return baseRate * difficultyMod[this.gameState.settings.difficulty] / this.gameState.difficulty;
+  }
+  
+  createTarget() {
+    const padding = 60;
+    const size = this.getTargetSize();
+    const types = this.gameState.settings.targetTypes;
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    return {
+      x: padding + Math.random() * (this.canvas.width - padding * 2),
+      y: padding + Math.random() * (this.canvas.height - padding * 2),
+      size: size,
+      type: type,
+      spawnTime: this.gameState.time,
+      lifetime: this.getTargetLifetime(),
+      alive: true,
+      points: this.getTargetPoints(type),
+      angle: 0,
+      rotationSpeed: type === 'moving' ? (Math.random() - 0.5) * 0.1 : 0,
+      moveX: type === 'moving' ? (Math.random() - 0.5) * 3 : 0,
+      moveY: type === 'moving' ? (Math.random() - 0.5) * 3 : 0,
+      shrinkRate: type === 'shrinking' ? 2 : 0,
+      color: this.getTargetColor(type),
+      perfectHit: false
+    };
+  }
+  
+  getTargetSize() {
+    const baseSize = this.gameState.settings.targetSize;
+    const sizeMod = {
+      easy: 1.3,
+      normal: 1,
+      hard: 0.8,
+      expert: 0.6
+    };
+    
+    return baseSize * sizeMod[this.gameState.settings.difficulty];
+  }
+  
+  getTargetLifetime() {
+    const baseLifetime = this.gameState.settings.targetLifetime;
+    const difficultyMod = {
+      easy: 1.5,
+      normal: 1,
+      hard: 0.7,
+      expert: 0.5
+    };
+    
+    return baseLifetime * difficultyMod[this.gameState.settings.difficulty];
+  }
+  
+  getTargetPoints(type) {
+    const basePoints = 100;
+    
+    const typeMultipliers = {
+      circle: 1,
+      square: 1.2,
+      triangle: 1.5,
+      moving: 2,
+      shrinking: 2.5
+    };
+    
+    return Math.floor(basePoints * (typeMultipliers[type] || 1) * this.gameState.difficulty);
+  }
+  
+  getTargetColor(type) {
+    const colors = {
+      circle: '#ff4444',
+      square: '#44ff44',
+      triangle: '#4444ff',
+      moving: '#ff44ff',
+      shrinking: '#ffff44'
+    };
+    
+    return colors[type] || '#ff4444';
+  }
+  
+  updateTargets(deltaTime) {
+    this.gameState.targets.forEach(target => {
+      if (!target.alive) return;
+      
+      target.lifetime -= deltaTime;
+      target.angle += target.rotationSpeed;
+      
+      if (target.moveX !== 0 || target.moveY !== 0) {
+        target.x += target.moveX;
+        target.y += target.moveY;
+        
+        if (target.x < 50 || target.x > this.canvas.width - 50) target.moveX *= -1;
+        if (target.y < 50 || target.y > this.canvas.height - 50) target.moveY *= -1;
       }
       
-      if (this.gameState.invulnerable <= 0) {
-        const p = this.gameState.player;
-        if (this.checkCollision({ x: p.x, y: p.y, width: p.width, height: p.height }, { x: e.x, y: e.y - 20, width: 30, height: 40 })) {
-          this.gameState.lives--;
-          this.gameState.invulnerable = 2;
-          if (this.gameState.lives <= 0) {
-            this.gameState.gameOver = true;
-          }
-        }
+      if (target.shrinkRate > 0) {
+        target.size = Math.max(10, target.size - target.shrinkRate * deltaTime / 1000);
       }
+      
+      if (target.lifetime <= 0) {
+        target.alive = false;
+        this.gameState.sessionStats.streak = 0;
+        this.gameState.combo = 0;
+      }
+    });
+    
+    this.gameState.targets = this.gameState.targets.filter(t => t.alive);
+  }
+  
+  updateBullets(deltaTime) {
+    this.gameState.bullets.forEach(bullet => {
+      bullet.life -= deltaTime;
+      
+      if (bullet.life <= 0) {
+        bullet.active = false;
+      }
+    });
+    
+    this.gameState.bullets = this.gameState.bullets.filter(b => b.active !== false);
+  }
+  
+  updateParticles(deltaTime) {
+    this.gameState.particles.forEach(particle => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.lifetime -= deltaTime;
+      particle.size *= 0.95;
+    });
+    
+    this.gameState.particles = this.gameState.particles.filter(p => p.lifetime > 0);
+  }
+  
+  updateHitMarkers(deltaTime) {
+    this.gameState.hitMarkers.forEach(marker => {
+      marker.lifetime -= deltaTime;
+    });
+    
+    this.gameState.hitMarkers = this.gameState.hitMarkers.filter(m => m.lifetime > 0);
+  }
+  
+  handleClick() {
+    if (this.gameState.status === 'menu') {
+      return;
+    }
+    
+    if (!this.gameState.roundActive) {
+      this.startGame();
+      return;
+    }
+    
+    const cx = this.gameState.crosshair.x;
+    const cy = this.gameState.crosshair.y;
+    
+    this.gameState.bullets.push({
+      x: cx,
+      y: cy,
+      active: true,
+      life: 100
+    });
+    
+    let hitAny = false;
+    
+    this.gameState.targets.forEach(target => {
+      if (!target.alive) return;
+      
+      const dist = this.getDistance({ x: cx, y: cy }, target);
+      
+      if (dist < target.size) {
+        this.hitTarget(target, cx, cy);
+        hitAny = true;
+      }
+    });
+    
+    if (!hitAny) {
+      this.gameState.sessionStats.streak = 0;
+      this.gameState.combo = 0;
+    }
+  }
+  
+  recordShot() {
+    if (this.gameState.status !== 'playing') return;
+    
+    const timeSinceLastHit = this.gameState.time - this.gameState.lastHitTime;
+    
+    if (this.gameState.lastHitTime > 0 && timeSinceLastHit < 2000) {
+      this.gameState.sessionStats.reactionTimes.push(timeSinceLastHit);
+    }
+  }
+  
+  hitTarget(target, cx, cy) {
+    target.alive = false;
+    
+    this.gameState.sessionStats.hits++;
+    this.gameState.sessionStats.streak++;
+    this.gameState.combo++;
+    
+    if (this.gameState.sessionStats.streak > this.gameState.sessionStats.maxStreak) {
+      this.gameState.sessionStats.maxStreak = this.gameState.sessionStats.streak;
+    }
+    
+    const dist = this.getDistance({ x: cx, y: cy }, target);
+    
+    if (dist < this.gameState.perfectZoneRadius) {
+      target.perfectHit = true;
+      this.gameState.sessionStats.perfectShots++;
+    }
+    
+    const comboMultiplier = Math.min(this.gameState.combo, 10);
+    const points = target.points * comboMultiplier;
+    
+    this.gameState.score += points;
+    this.gameState.lastHitTime = this.gameState.time;
+    
+    this.createHitEffect(target.x, target.y, target.color, target.perfectHit);
+    this.addHitMarker(cx, cy, target.perfectHit);
+    this.playSound('hit');
+  }
+  
+  getDistance(a, b) {
+    return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+  }
+  
+  createHitEffect(x, y, color, isPerfect) {
+    const particleCount = isPerfect ? 30 : 15;
+    const size = isPerfect ? 8 : 5;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 6;
+      
+      this.gameState.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        color: isPerfect ? '#ffffff' : color,
+        size: size + Math.random() * size,
+        lifetime: isPerfect ? 600 : 400
+      });
+    }
+    
+    if (isPerfect) {
+      this.gameState.particles.push({
+        x: x,
+        y: y - 30,
+        text: 'PERFECT!',
+        color: '#ffffff',
+        lifetime: 600,
+        isText: true
+      });
+    }
+  }
+  
+  addHitMarker(x, y, isPerfect) {
+    this.gameState.hitMarkers.push({
+      x: x,
+      y: y,
+      size: isPerfect ? 20 : 15,
+      lifetime: 300,
+      perfect: isPerfect
     });
   }
   
-  getPlayerInput(playerName) {
-    return window.gameState && window.gameState[playerName] ? window.gameState[playerName].input || {} : {};
+  calculateStats() {
+    if (this.gameState.sessionStats.shots > 0) {
+      this.gameState.sessionStats.accuracy = 
+        Math.round((this.gameState.sessionStats.hits / this.gameState.sessionStats.shots) * 100);
+    }
+    
+    if (this.gameState.sessionStats.reactionTimes.length > 0) {
+      const sum = this.gameState.sessionStats.reactionTimes.reduce((a, b) => a + b, 0);
+      this.gameState.sessionStats.avgTime = 
+        Math.round(sum / this.gameState.sessionStats.reactionTimes.length);
+    }
+  }
+  
+  setMode(modeIndex) {
+    this.gameState.currentMode = this.gameState.modes[modeIndex].name;
+    this.gameState.gameDuration = this.gameState.modes[modeIndex].duration;
+  }
+  
+  setDifficulty(difficulty) {
+    this.gameState.settings.difficulty = difficulty;
+    this.gameState.difficulty = {
+      easy: 0.8,
+      normal: 1,
+      hard: 1.3,
+      expert: 1.6
+    }[difficulty];
+  }
+  
+  startGame() {
+    this.gameState.status = 'playing';
+    this.gameState.roundActive = true;
+    this.gameState.gameTimer = this.gameState.gameDuration;
+    this.gameState.score = 0;
+    this.gameState.combo = 0;
+    this.gameState.targets = [];
+    this.gameState.bullets = [];
+    this.gameState.particles = [];
+    this.gameState.hitMarkers = [];
+    this.gameState.sessionStats = {
+      shots: 0,
+      hits: 0,
+      accuracy: 0,
+      avgTime: 0,
+      bestTime: Infinity,
+      reactionTimes: [],
+      perfectShots: 0,
+      streak: 0,
+      maxStreak: 0,
+      headshots: 0,
+      totalTargets: 0
+    };
+    this.gameState.targetSpawnTimer = 0;
+    this.gameState.lastHitTime = 0;
+    this.clicks = 0;
+  }
+  
+  endGame() {
+    this.gameState.status = 'gameover';
+    this.gameState.roundActive = false;
+    
+    if (this.gameState.score > this.gameState.highScore) {
+      this.gameState.highScore = this.gameState.score;
+      localStorage.setItem('targetPracticeHighScore', this.gameState.highScore);
+    }
+    
+    this.playSound('gameover');
+  }
+  
+  playSound(type) {
+    if (!this.gameState.settings.soundEffects) return;
+    
+    if (typeof AudioContext !== 'undefined') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        const frequencies = {
+          hit: 800,
+          gameover: 300
+        };
+        
+        oscillator.frequency.value = frequencies[type] || 440;
+        oscillator.type = type === 'hit' ? 'sine' : 'square';
+        gainNode.gain.value = 0.05;
+        
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        oscillator.stop(audioCtx.currentTime + 0.1);
+      } catch (e) {}
+    }
   }
   
   render() {
-    const bgGrad = this.ctx.createLinearGradient(0, 0, 0, 600);
-    bgGrad.addColorStop(0, '#1a1a2e');
-    bgGrad.addColorStop(0.5, '#2c3e50');
-    bgGrad.addColorStop(1, '#0a0a1a');
-    this.ctx.fillStyle = bgGrad;
-    this.ctx.fillRect(0, 0, 800, 600);
+    const ctx = this.ctx;
     
-    this.ctx.fillStyle = '#4a4a4a';
-    this.ctx.fillRect(0, 530, 800, 70);
-    this.ctx.fillStyle = '#3a3a3a';
-    this.ctx.fillRect(0, 530, 800, 5);
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
-    this.ctx.fillStyle = '#5d6d7e';
-    this.gameState.platforms.forEach(plat => {
-      this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-      this.ctx.strokeStyle = '#7f8c8d';
-      this.ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
-    });
+    if (this.gameState.status === 'menu') {
+      this.renderMenu();
+      return;
+    }
     
-    this.gameState.enemies.forEach(e => {
-      this.ctx.fillStyle = '#27ae60';
-      this.ctx.fillRect(e.x - 15, e.y - 40, 30, 40);
-      this.ctx.fillStyle = '#2ecc71';
-      this.ctx.fillRect(e.x - 15, e.y - 40, 30, 15);
-      this.ctx.fillStyle = '#000';
-      this.ctx.fillRect(e.x - 8, e.y - 35, 6, 4);
-      this.ctx.fillRect(e.x + 2, e.y - 35, 6, 4);
+    this.renderGrid();
+    this.renderTargets();
+    this.renderBullets();
+    this.renderParticles();
+    this.renderHitMarkers();
+    this.renderCrosshair();
+    this.renderUI();
+    
+    if (this.gameState.status === 'gameover') {
+      this.renderGameOver();
+    }
+  }
+  
+  renderMenu() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('TARGET PRACTICE', this.canvas.width / 2, 80);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '20px Arial';
+    ctx.fillText('Aim Training Module', this.canvas.width / 2, 115);
+    
+    ctx.fillStyle = '#0f3460';
+    ctx.fillRect(100, 150, this.canvas.width - 200, 280);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '18px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Select Mode:', 120, 180);
+    
+    this.gameState.modes.forEach((mode, index) => {
+      const y = 210 + index * 45;
       
-      if (e.shooting) {
-        this.ctx.fillStyle = '#f1c40f';
-        this.ctx.fillRect(e.x - 25, e.y - 15, 10, 5);
+      ctx.fillStyle = index === 0 ? '#e94560' : '#533483';
+      ctx.fillRect(120, y, 300, 35);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px Arial';
+      ctx.fillText(mode.name, 130, y + 23);
+      
+      if (index === 0) {
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#cccccc';
+        ctx.fillText(mode.description, 440, y + 23);
       }
     });
     
-    this.gameState.bullets.forEach(b => {
-      if (b.owner === 'player') {
-        this.ctx.fillStyle = '#f1c40f';
-        this.ctx.fillRect(b.x - 5, b.y - 2, 10, 4);
-      } else {
-        this.ctx.fillStyle = '#e74c3c';
-        this.ctx.beginPath();
-        this.ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
-        this.ctx.fill();
-      }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '18px Arial';
+    ctx.fillText('Difficulty:', 120, 430);
+    
+    const difficulties = ['easy', 'normal', 'hard', 'expert'];
+    difficulties.forEach((diff, index) => {
+      const x = 230 + index * 80;
+      
+      ctx.fillStyle = diff === 'normal' ? '#e94560' : '#533483';
+      ctx.fillRect(x, 425, 70, 30);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(diff.toUpperCase(), x + 35, 447);
     });
     
-    const p = this.gameState.player;
-    if (this.gameState.invulnerable <= 0 || Math.floor(this.gameState.time * 15) % 2 === 0) {
-      const px = p.x;
-      const py = p.y;
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('CLICK TO START', this.canvas.width / 2, 520);
+    
+    ctx.fillStyle = '#888888';
+    ctx.font = '14px Arial';
+    ctx.fillText(`High Score: ${this.gameState.highScore}`, this.canvas.width / 2, 550);
+  }
+  
+  renderGrid() {
+    const ctx = this.ctx;
+    
+    ctx.strokeStyle = '#16213e';
+    ctx.lineWidth = 1;
+    
+    for (let x = 0; x < this.canvas.width; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.canvas.height);
+      ctx.stroke();
+    }
+    
+    for (let y = 0; y < this.canvas.height; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.canvas.width, y);
+      ctx.stroke();
+    }
+  }
+  
+  renderTargets() {
+    const ctx = this.ctx;
+    
+    this.gameState.targets.forEach(target => {
+      if (!target.alive) return;
       
-      this.ctx.fillStyle = '#3498db';
-      this.ctx.fillRect(px, py, p.width, p.height);
-      this.ctx.fillStyle = '#f5d0c5';
-      this.ctx.beginPath();
-      this.ctx.arc(px + 15, py - 5, 12, 0, Math.PI*2);
-      this.ctx.fill();
+      ctx.save();
+      ctx.translate(target.x, target.y);
+      ctx.rotate(target.angle);
       
-      this.ctx.fillStyle = '#000';
-      const eyeX = p.facingRight ? px + 20 : px + 8;
-      this.ctx.fillRect(eyeX, py - 8, 4, 4);
+      ctx.fillStyle = target.color;
       
-      this.ctx.fillStyle = '#e74c3c';
-      this.ctx.fillRect(px + 5, py + 5, 20, 8);
+      switch (target.type) {
+        case 'circle':
+          ctx.beginPath();
+          ctx.arc(0, 0, target.size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(0, 0, target.size * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = target.color;
+          ctx.beginPath();
+          ctx.arc(0, 0, target.size * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+          
+        case 'square':
+          ctx.fillRect(-target.size, -target.size, target.size * 2, target.size * 2);
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-target.size * 0.5, -target.size * 0.5, target.size, target.size);
+          break;
+          
+        case 'triangle':
+          ctx.beginPath();
+          ctx.moveTo(0, -target.size);
+          ctx.lineTo(target.size, target.size);
+          ctx.lineTo(-target.size, target.size);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(0, -target.size * 0.3);
+          ctx.lineTo(target.size * 0.3, target.size * 0.3);
+          ctx.lineTo(-target.size * 0.3, target.size * 0.3);
+          ctx.closePath();
+          ctx.fill();
+          break;
+          
+        case 'moving':
+        case 'shrinking':
+          ctx.beginPath();
+          ctx.arc(0, 0, target.size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          const ringCount = 3;
+          for (let i = 1; i <= ringCount; i++) {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 - i * 0.15})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, target.size * (i / ringCount), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          break;
+      }
       
-      if (!p.grounded) {
-        this.ctx.fillStyle = '#8b4513';
-        this.ctx.fillRect(px - 5, py + 15, 8, 15);
-        this.ctx.fillRect(px + 27, py + 15, 8, 15);
-      } else {
-        this.ctx.fillStyle = '#8b4513';
-        this.ctx.fillRect(px, py + 25, 8, 12);
-        this.ctx.fillRect(px + 22, py + 25, 8, 12);
+      ctx.restore();
+    });
+  }
+  
+  renderBullets() {
+    const ctx = this.ctx;
+    
+    this.gameState.bullets.forEach(bullet => {
+      if (!bullet.active) return;
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  renderParticles() {
+    const ctx = this.ctx;
+    
+    this.gameState.particles.forEach(particle => {
+      if (particle.isText) {
+        ctx.fillStyle = particle.color;
+        ctx.globalAlpha = particle.lifetime / 600;
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(particle.text, particle.x, particle.y);
+        ctx.globalAlpha = 1;
+        return;
+      }
+      
+      ctx.fillStyle = particle.color;
+      ctx.globalAlpha = particle.lifetime / 600;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+  }
+  
+  renderHitMarkers() {
+    const ctx = this.ctx;
+    
+    this.gameState.hitMarkers.forEach(marker => {
+      ctx.strokeStyle = marker.perfect ? '#ffffff' : '#ff4444';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = marker.lifetime / 300;
+      
+      const size = marker.size;
+      
+      ctx.beginPath();
+      ctx.moveTo(marker.x - size, marker.y - size);
+      ctx.lineTo(marker.x - size / 2, marker.y - size / 2);
+      ctx.moveTo(marker.x + size, marker.y - size);
+      ctx.lineTo(marker.x + size / 2, marker.y - size / 2);
+      ctx.moveTo(marker.x - size, marker.y + size);
+      ctx.lineTo(marker.x - size / 2, marker.y + size / 2);
+      ctx.moveTo(marker.x + size, marker.y + size);
+      ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
+      ctx.stroke();
+      
+      ctx.globalAlpha = 1;
+    });
+  }
+  
+  renderCrosshair() {
+    if (!this.gameState.settings.showCrosshair) return;
+    
+    const ctx = this.ctx;
+    const cx = this.gameState.crosshair.x;
+    const cy = this.gameState.crosshair.y;
+    
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, cy);
+    ctx.lineTo(cx - 4, cy);
+    ctx.moveTo(cx + 4, cy);
+    ctx.lineTo(cx + 12, cy);
+    ctx.moveTo(cx, cy - 12);
+    ctx.lineTo(cx, cy - 4);
+    ctx.moveTo(cx, cy + 4);
+    ctx.lineTo(cx, cy + 12);
+    ctx.stroke();
+    
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    if (this.gameState.combo > 1) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${this.gameState.combo}x`, cx, cy - 20);
+    }
+  }
+  
+  renderUI() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${this.gameState.score}`, 20, 40);
+    
+    ctx.textAlign = 'right';
+    ctx.fillText(`High: ${this.gameState.highScore}`, this.canvas.width - 20, 40);
+    
+    if (this.gameState.currentMode !== 'Endless') {
+      const timerColor = this.gameState.gameTimer < 10 ? '#ff4444' : '#ffffff';
+      ctx.fillStyle = timerColor;
+      ctx.font = 'bold 36px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.ceil(this.gameState.gameTimer).toString(), this.canvas.width / 2, 45);
+    }
+    
+    if (this.gameState.settings.showAccuracy) {
+      ctx.fillStyle = '#888888';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'left';
+      
+      const stats = this.gameState.sessionStats;
+      
+      if (this.gameState.roundActive) {
+        ctx.fillText(`Hits: ${stats.hits} / ${this.clicks}`, 20, 75);
+        ctx.fillText(`Accuracy: ${stats.accuracy}%`, 20, 95);
+        
+        if (stats.avgTime > 0) {
+          ctx.fillText(`Avg Time: ${stats.avgTime}ms`, 20, 115);
+        }
+        
+        if (stats.maxStreak > 0) {
+          ctx.fillText(`Best Streak: ${stats.maxStreak}`, 20, 135);
+        }
+        
+        if (stats.perfectShots > 0) {
+          ctx.fillStyle = '#ffff00';
+          ctx.fillText(`Perfect: ${stats.perfectShots}`, 20, 155);
+        }
       }
     }
     
-    this.ctx.fillStyle = '#2ecc71';
-    this.ctx.fillRect(20, 550, 200, 20);
-    this.ctx.fillStyle = '#e74c3c';
-    this.ctx.fillRect(20, 550, 200 * (this.gameState.lives / 3), 20);
-    this.ctx.strokeStyle = '#fff';
-    this.ctx.strokeRect(20, 550, 200, 20);
-    
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = '16px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText('Score: ' + this.gameState.score, 20, 30);
-    this.ctx.fillStyle = '#ffd93d';
-    this.ctx.fillText('CONTRA', this.canvas.width/2, 25);
+    if (this.gameState.combo > 5) {
+      ctx.fillStyle = '#ff8800';
+      ctx.font = 'bold 24px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${this.gameState.combo} COMBO!`, this.canvas.width / 2, this.canvas.height - 40);
+    }
   }
   
-  updatePlayerInput(name, input) {
-    window.gameState = window.gameState || {};
-    window.gameState[name] = { input: input };
+  renderGameOver() {
+    const ctx = this.ctx;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('SESSION COMPLETE', this.canvas.width / 2, 80);
+    
+    const stats = this.gameState.sessionStats;
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '28px Arial';
+    ctx.fillText(`Final Score: ${this.gameState.score}`, this.canvas.width / 2, 140);
+    
+    ctx.fillStyle = '#888888';
+    ctx.font = '20px Arial';
+    ctx.fillText(`Accuracy: ${stats.accuracy}%`, this.canvas.width / 2, 190);
+    ctx.fillText(`Hits: ${stats.hits} / ${this.clicks}`, this.canvas.width / 2, 220);
+    ctx.fillText(`Best Streak: ${stats.maxStreak}`, this.canvas.width / 2, 250);
+    ctx.fillText(`Perfect Hits: ${stats.perfectShots}`, this.canvas.width / 2, 280);
+    
+    if (stats.avgTime > 0) {
+      ctx.fillText(`Average Reaction: ${stats.avgTime}ms`, this.canvas.width / 2, 310);
+    }
+    
+    if (stats.bestTime < Infinity) {
+      ctx.fillText(`Best Reaction: ${stats.bestTime}ms`, this.canvas.width / 2, 340);
+    }
+    
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText('CLICK TO PLAY AGAIN', this.canvas.width / 2, 420);
+  }
+  
+  restart() {
+    this.gameState.status = 'menu';
+    this.gameState.roundActive = false;
+    this.gameState.score = 0;
+    this.gameState.targets = [];
+    this.gameState.bullets = [];
+    this.gameState.particles = [];
+    this.gameState.hitMarkers = [];
+    this.gameState.sessionStats = {
+      shots: 0,
+      hits: 0,
+      accuracy: 0,
+      avgTime: 0,
+      bestTime: Infinity,
+      reactionTimes: [],
+      perfectShots: 0,
+      streak: 0,
+      maxStreak: 0,
+      headshots: 0,
+      totalTargets: 0
+    };
+    this.clicks = 0;
+    this.start();
   }
 }
 
-window.ContraGame = ContraGame;
+window.TargetPracticeGame = TargetPracticeGame;
+
+window.addEventListener('click', function(e) {
+  if (window.targetPracticeGameInstance && window.targetPracticeGameInstance.gameState.status === 'menu') {
+    window.targetPracticeGameInstance.startGame();
+  } else if (window.targetPracticeGameInstance && window.targetPracticeGameInstance.gameState.status === 'gameover') {
+    window.targetPracticeGameInstance.restart();
+  }
+});
+
+window.targetPracticeGameInstance = null;
+window.TargetPracticeGame = TargetPracticeGame;

@@ -1,535 +1,854 @@
-// Action Game 2 - Urban Warfare
-(function() {
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+// Urban Warfare - City Combat Action Game
+class UrbanWarfareGame {
+  constructor(canvas, players, gameId) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.players = players;
+    this.gameId = gameId;
+    this.isRunning = false;
+    this.lastTime = 0;
     
-    const game = {
-        state: 'playing',
-        score: 0,
-        wave: 1,
-        waveTimer: 30,
-        players: [],
-        enemies: [],
-        bullets: [],
-        grenades: [],
-        coverObjects: [],
-        particles: [],
-        totalEnemiesSpawned: 0,
-        enemiesPerWave: 10,
-        enemiesKilled: 0
+    this.resizeCanvas();
+    window.addEventListener('resize', () => this.resizeCanvas());
+    
+    this.gameState = {
+      time: 0,
+      score: 0,
+      wave: 1,
+      status: 'playing',
+      players: [],
+      enemies: [],
+      bullets: [],
+      grenades: [],
+      coverObjects: [],
+      vehicles: [],
+      explosions: [],
+      particles: []
     };
-
-    class Player {
-        constructor(id, x) {
-            this.id = id;
-            this.x = x;
-            this.y = canvas.height - 80;
-            this.width = 30;
-            this.height = 50;
-            this.health = 100;
-            this.maxHealth = 100;
-            this.angle = 0;
-            this.sprinting = false;
-            this.reloading = 0;
-            this.ammo = 30;
-            this.maxAmmo = 30;
-            this.cover = null;
-            this.kills = 0;
-            this.headshots = 0;
-        }
-        
-        update(keys) {
-            if (this.health <= 0) return;
-            
-            if (this.reloading > 0) this.reloading--;
-            
-            let dx = 0, dy = 0;
-            if (keys.up) dy = -1;
-            if (keys.down) dy = 1;
-            if (keys.left) dx = -1;
-            if (keys.right) dx = 1;
-            
-            if (dx !== 0 || dy !== 0) {
-                const speed = this.sprinting ? 5 : 3;
-                this.x += dx * speed;
-                this.y += dy * speed;
-                
-                this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
-                this.y = Math.max(100, Math.min(canvas.height - 100, this.y));
-            }
-            
-            if (this.cover) {
-                this.health = Math.min(this.maxHealth, this.health + 0.1);
-            }
-        }
-        
-        draw() {
-            if (this.health <= 0) {
-                ctx.globalAlpha = 0.3;
-            }
-            
-            ctx.save();
-            ctx.translate(this.x, this.y);
-            
-            ctx.fillStyle = '#2c3e50';
-            ctx.fillRect(-15, -25, 30, 50);
-            
-            ctx.fillStyle = '#e74c3c';
-            ctx.beginPath();
-            ctx.arc(0, -35, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.fillStyle = '#f1c40f';
-            ctx.fillRect(-12, -25, 24, 8);
-            
-            ctx.fillStyle = '#3498db';
-            const gunLength = this.sprinting ? 25 : 15;
-            ctx.fillRect(10, -15, gunLength, 6);
-            
-            if (this.cover) {
-                ctx.strokeStyle = '#2ecc71';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(0, 0, 30, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-            
-            ctx.restore();
-            
-            if (this.health > 0) {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(this.x - 25, this.y + 30, 50, 8);
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(this.x - 24, this.y + 31, 48 * (this.health / this.maxHealth), 6);
-            }
-            
-            ctx.globalAlpha = 1;
-        }
-    }
-
-    class Enemy {
-        constructor(type) {
-            this.x = Math.random() < 0.5 ? -20 : canvas.width + 20;
-            this.y = 100 + Math.random() * (canvas.height - 200);
-            this.type = type;
-            this.width = 30;
-            this.height = 50;
-            this.health = 50 + type * 30;
-            this.maxHealth = this.health;
-            this.speed = 1 + type * 0.5;
-            this.damage = 10 + type * 5;
-            this.accuracy = 0.3 + type * 0.15;
-            this.shootCooldown = 0;
-            this.state = 'advancing';
-            this.targetPlayer = null;
-            this.headshotHeight = -35;
-            this.crouching = false;
-        }
-        
-        update(players) {
-            if (this.health <= 0) return;
-            
-            this.shootCooldown--;
-            
-            const alivePlayers = players.filter(p => p.health > 0);
-            if (alivePlayers.length > 0 && !this.targetPlayer) {
-                this.targetPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-            }
-            
-            if (this.targetPlayer && this.targetPlayer.health <= 0) {
-                this.targetPlayer = null;
-                return;
-            }
-            
-            if (this.targetPlayer) {
-                const dx = this.targetPlayer.x - this.x;
-                const dy = this.targetPlayer.y - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist > 200) {
-                    this.x += (dx / dist) * this.speed;
-                    this.y += (dy / dist) * this.speed;
-                    this.state = 'advancing';
-                } else if (dist > 100) {
-                    this.state = 'positioning';
-                    if (Math.random() < 0.02) {
-                        this.crouching = !this.crouching;
-                    }
-                } else {
-                    this.state = 'attacking';
-                    
-                    if (this.shootCooldown <= 0 && Math.random() < this.accuracy) {
-                        const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.3;
-                        game.bullets.push({
-                            x: this.x,
-                            y: this.y - (this.crouching ? 15 : 25),
-                            vx: Math.cos(angle) * 8,
-                            vy: Math.sin(angle) * 8,
-                            damage: this.damage,
-                            isEnemy: true,
-                            owner: this
-                        });
-                        this.shootCooldown = 60;
-                    }
-                }
-            }
-        }
-        
-        draw() {
-            ctx.save();
-            ctx.translate(this.x, this.y);
-            
-            const bodyHeight = this.crouching ? 30 : 50;
-            const bodyY = this.crouching ? -15 : -25;
-            
-            const hue = (this.type * 60) % 360;
-            ctx.fillStyle = `hsl(${hue}, 60%, 30%)`;
-            ctx.fillRect(-15, bodyY, 30, bodyHeight);
-            
-            ctx.fillStyle = '#000';
-            const headY = this.crouching ? -20 : -35;
-            ctx.beginPath();
-            ctx.arc(0, headY, 10, 0, Math.PI * 2);
-            ctx.fill();
-            
-            if (this.state === 'attacking') {
-                ctx.fillStyle = '#555';
-                ctx.fillRect(5, -20, 15, 5);
-            }
-            
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-15, bodyY + bodyHeight + 5, 30, 6);
-            ctx.fillStyle = '#2c2c2c';
-            ctx.fillRect(-15, bodyY + bodyHeight + 10, 30, 6);
-            
-            ctx.restore();
-            
-            if (this.health < this.maxHealth) {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(this.x - 20, this.y - 50, 40, 6);
-                ctx.fillStyle = '#e74c3c';
-                ctx.fillRect(-19, -49, 38 * (this.health / this.maxHealth), 4);
-            }
-        }
-        
-        getHeadshotBox() {
-            return {
-                x: this.x - 10,
-                y: this.y - 45,
-                width: 20,
-                height: 20
-            };
-        }
-    }
-
-    class CoverObject {
-        constructor(x, y, width, height) {
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-            this.health = 100;
-            this.maxHealth = 100;
-            this.destructible = true;
-        }
-        
-        draw() {
-            ctx.fillStyle = this.health > 50 ? '#7f8c8d' : '#5d6d7e';
-            ctx.fillRect(this.x - this.width/2, this.y - this.height, this.width, this.height);
-            
-            ctx.fillStyle = '#95a5a6';
-            ctx.fillRect(this.x - this.width/2 + 5, this.y - this.height + 5, this.width - 10, 10);
-            
-            if (this.destructible && this.health < this.maxHealth) {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(this.x - this.width/2, this.y - this.height - 10, this.width, 5);
-                ctx.fillStyle = '#e67e22';
-                ctx.fillRect(this.x - this.width/2, this.y - this.height - 10, this.width * (this.health / this.maxHealth), 5);
-            }
-        }
-    }
-
-    function spawnWave() {
-        game.wave++;
-        game.waveTimer = 30;
-        game.enemiesPerWave += 5;
-        game.totalEnemiesSpawned = 0;
-        
-        for (let i = 0; i < 3; i++) {
-            game.coverObjects.push(new CoverObject(
-                100 + i * 200 + Math.random() * 50,
-                canvas.height - 150,
-                60 + Math.random() * 40,
-                40 + Math.random() * 30
-            ));
-        }
-    }
-
-    function handleInput(data) {
-        if (game.state !== 'playing') return;
-        
-        const player = game.players[0];
-        if (!player || player.health <= 0) return;
-        
-        const keys = { up: false, down: false, left: false, right: false };
-        if (data.tilt) {
-            keys.left = data.tilt < -0.3;
-            keys.right = data.tilt > 0.3;
-            keys.up = data.tiltY < -0.3;
-            keys.down = data.tiltY > 0.3;
-        }
-        if (data.buttons) {
-            keys.up = keys.up || data.buttons[0];
-            keys.down = keys.down || data.buttons[1];
-            keys.left = keys.left || data.buttons[2];
-            keys.right = keys.right || data.buttons[3];
-        }
-        
-        player.sprinting = data.sprint || false;
-        
-        player.update(keys);
-        
-        if (data.shoot && player.reloading <= 0 && player.ammo > 0) {
-            const angle = data.angle || 0;
-            game.bullets.push({
-                x: player.x + Math.cos(angle) * 30,
-                y: player.y - 15 + Math.sin(angle) * 30,
-                vx: Math.cos(angle) * 15,
-                vy: Math.sin(angle) * 15,
-                damage: 20,
-                isEnemy: false,
-                owner: player
-            });
-            player.ammo--;
-            if (player.ammo <= 0) {
-                player.reloading = 120;
-                player.ammo = player.maxAmmo;
-            }
-        }
-        
-        if (data.grenade) {
-            const angle = data.angle || 0;
-            game.grenades.push({
-                x: player.x,
-                y: player.y,
-                vx: Math.cos(angle) * 5,
-                vy: -8,
-                timer: 60
-            });
-        }
-        
-        game.coverObjects.forEach(cover => {
-            const dx = player.x - cover.x;
-            const dy = player.y - (cover.y - cover.height/2);
-            if (Math.abs(dx) < 50 && Math.abs(dy) < 50) {
-                player.cover = cover;
-            }
-        });
-        if (!game.coverObjects.some(c => {
-            const dx = player.x - c.x;
-            const dy = player.y - (c.y - c.height/2);
-            return Math.abs(dx) < 50 && Math.abs(dy) < 50;
-        })) {
-            player.cover = null;
-        }
-    }
-
-    function update() {
-        if (game.state !== 'playing') return;
-        
-        game.players.forEach(p => {
-            if (p.health <= 0) {
-                p.health = Math.max(0, p.health);
-            }
-        });
-        
-        const alivePlayers = game.players.filter(p => p.health > 0);
-        if (alivePlayers.length === 0) {
-            game.state = 'gameover';
-            return;
-        }
-        
-        if (game.totalEnemiesSpawned < game.enemiesPerWave && Math.random() < 0.03) {
-            const type = Math.min(5, Math.floor(game.wave / 3));
-            game.enemies.push(new Enemy(type));
-            game.totalEnemiesSpawned++;
-        }
-        
-        if (game.enemies.length === 0 && game.totalEnemiesSpawned >= game.enemiesPerWave) {
-            spawnWave();
-        }
-        
-        game.enemies.forEach(e => e.update(game.players));
-        
-        for (let i = game.bullets.length - 1; i >= 0; i--) {
-            const b = game.bullets[i];
-            b.x += b.vx;
-            b.y += b.vy;
-            
-            if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
-                game.bullets.splice(i, 1);
-                continue;
-            }
-            
-            if (!b.isEnemy) {
-                for (let j = game.enemies.length - 1; j >= 0; j--) {
-                    const e = game.enemies[j];
-                    if (e.health <= 0) continue;
-                    
-                    const headBox = e.getHeadshotBox();
-                    if (b.x > headBox.x && b.x < headBox.x + headBox.width &&
-                        b.y > headBox.y && b.y < headBox.y + headBox.height) {
-                        e.health -= b.damage * 2;
-                        b.owner.headshots++;
-                        b.owner.kills++;
-                        game.score += 50;
-                        if (e.health <= 0) {
-                            game.enemies.splice(j, 1);
-                            game.enemiesKilled++;
-                            game.score += 100;
-                        }
-                        game.bullets.splice(i, 1);
-                        break;
-                    }
-                    
-                    if (b.x > e.x - 15 && b.x < e.x + 15 &&
-                        b.y > e.y - 25 && b.y < e.y + 25) {
-                        e.health -= b.damage;
-                        b.owner.kills++;
-                        if (e.health <= 0) {
-                            game.enemies.splice(j, 1);
-                            game.enemiesKilled++;
-                            game.score += 100;
-                        }
-                        game.bullets.splice(i, 1);
-                        break;
-                    }
-                }
-            } else {
-                for (let j = 0; j < game.players.length; j++) {
-                    const p = game.players[j];
-                    if (p.health <= 0) continue;
-                    
-                    if (b.x > p.x - 15 && b.x < p.x + 15 &&
-                        b.y > p.y - 25 && b.y < p.y + 25) {
-                        p.health -= b.damage;
-                        if (p.cover) {
-                            p.cover.health -= b.damage;
-                            if (p.cover.health <= 0) {
-                                p.cover = null;
-                            }
-                        }
-                        game.bullets.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        for (let i = game.grenades.length - 1; i >= 0; i--) {
-            const g = game.grenades[i];
-            g.x += g.vx;
-            g.y += g.vy;
-            g.vy += 0.3;
-            g.timer--;
-            
-            if (g.timer <= 0) {
-                for (let j = game.enemies.length - 1; j >= 0; j--) {
-                    const e = game.enemies[j];
-                    const dx = e.x - g.x;
-                    const dy = e.y - g.y;
-                    if (Math.sqrt(dx*dx + dy*dy) < 100) {
-                        e.health -= 50;
-                        if (e.health <= 0) {
-                            game.enemies.splice(j, 1);
-                            game.enemiesKilled++;
-                            game.score += 150;
-                        }
-                    }
-                }
-                game.grenades.splice(i, 1);
-            }
-        }
-        
-        game.coverObjects = game.coverObjects.filter(c => c.health > 0);
-    }
-
-    function draw() {
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#2c3e50';
-        for (let i = 0; i < 10; i++) {
-            ctx.fillRect(i * 100, 0, 2, canvas.height);
-        }
-        for (let i = 0; i < 8; i++) {
-            ctx.fillRect(0, i * 100, canvas.width, 2);
-        }
-        
-        game.coverObjects.forEach(c => c.draw());
-        
-        game.enemies.forEach(e => e.draw());
-        
-        game.players.forEach(p => p.draw());
-        
-        ctx.fillStyle = '#e74c3c';
-        game.bullets.forEach(b => {
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        
-        ctx.fillStyle = '#f39c12';
-        game.grenades.forEach(g => {
-            ctx.beginPath();
-            ctx.arc(g.x, g.y, 8, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 200, 100);
-        
-        ctx.font = 'bold 20px Arial';
-        ctx.fillStyle = '#fff';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Wave: ${game.wave}`, 20, 35);
-        ctx.fillText(`Score: ${game.score}`, 20, 60);
-        ctx.fillText(`Enemies: ${game.enemies.length}`, 20, 85);
-        
-        const player = game.players[0];
-        if (player) {
-            ctx.fillStyle = '#fff';
-            ctx.fillText(`Ammo: ${player.ammo}/${player.maxAmmo}`, 20, 110);
-        }
-        
-        if (game.state === 'gameover') {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.font = 'bold 60px Arial';
-            ctx.fillStyle = '#e74c3c';
-            ctx.textAlign = 'center';
-            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 40);
-            
-            ctx.font = '30px Arial';
-            ctx.fillStyle = '#fff';
-            ctx.fillText(`Final Score: ${game.score}`, canvas.width/2, canvas.height/2 + 20);
-            ctx.fillText(`Wave Reached: ${game.wave}`, canvas.width/2, canvas.height/2 + 60);
-            ctx.fillText(`Enemies Killed: ${game.enemiesKilled}`, canvas.width/2, canvas.height/2 + 100);
-        }
-    }
-
-    function gameLoop() {
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    game.players.push(new Player(1, canvas.width / 2));
     
-    if (typeof window !== 'undefined') {
-        window.gameHandleInput = handleInput;
+    this.initGame();
+  }
+  
+  resizeCanvas() {
+    this.canvas.width = this.canvas.parentElement.clientWidth || 800;
+    this.canvas.height = this.canvas.parentElement.clientHeight || 600;
+  }
+  
+  initGame() {
+    this.createMap();
+    
+    this.players.forEach((p, i) => {
+      this.gameState.players.push({
+        name: p,
+        x: 100 + i * 150,
+        y: this.canvas.height - 150,
+        vx: 0,
+        vy: 0,
+        speed: 4,
+        radius: 15,
+        health: 100,
+        maxHealth: 100,
+        ammo: 30,
+        maxAmmo: 30,
+        weapon: 'rifle',
+        lastShot: 0,
+        lastGrenade: 0,
+        grenades: 3,
+        inCover: false,
+        coverObject: null,
+        facing: 1,
+        reloadTimer: 0,
+        color: ['#e74c3c', '#3498db', '#2ecc71', '#f39c12'][i % 4]
+      });
+    });
+    
+    this.spawnWave();
+  }
+  
+  createMap() {
+    const coverPositions = [
+      { x: 200, y: this.canvas.height - 180 },
+      { x: 400, y: this.canvas.height - 180 },
+      { x: 600, y: this.canvas.height - 180 },
+      { x: 300, y: this.canvas.height - 300 },
+      { x: 500, y: this.canvas.height - 300 }
+    ];
+    
+    coverPositions.forEach(pos => {
+      this.gameState.coverObjects.push({
+        x: pos.x,
+        y: pos.y,
+        width: 60,
+        height: 40,
+        health: 50,
+        type: 'crate'
+      });
+    });
+    
+    const buildingPositions = [
+      { x: 50, y: 50, w: 100, h: 200 },
+      { x: 650, y: 50, w: 100, h: 200 },
+      { x: 300, y: 100, w: 200, h: 150 }
+    ];
+    
+    buildingPositions.forEach(b => {
+      this.gameState.coverObjects.push({
+        x: b.x,
+        y: b.y,
+        width: b.w,
+        height: b.h,
+        health: 200,
+        type: 'building'
+      });
+    });
+  }
+  
+  spawnWave() {
+    const enemyCount = 2 + this.gameState.wave * 2;
+    
+    for (let i = 0; i < enemyCount; i++) {
+      const types = ['soldier', 'sniper', 'grenadier', 'heavy', 'commando'];
+      const type = types[Math.min(Math.floor(Math.random() * types.length), Math.min(this.gameState.wave - 1, 4))];
+      
+      this.gameState.enemies.push(this.createEnemy(type));
+    }
+  }
+  
+  createEnemy(type) {
+    const side = Math.random() > 0.5 ? 1 : -1;
+    const baseEnemy = {
+      x: side > 0 ? this.canvas.width + 30 : -30,
+      y: this.canvas.height - 150 - Math.random() * 100,
+      vx: 0,
+      vy: 0,
+      radius: 15,
+      health: 40 + this.gameState.wave * 15,
+      maxHealth: 40 + this.gameState.wave * 15,
+      damage: 8 + this.gameState.wave * 3,
+      speed: 1.5 + Math.random(),
+      type: type,
+      state: 'idle',
+      attackCooldown: 0,
+      hitStun: 0,
+      accuracy: 0.6,
+      color: '#5d6d7e',
+      inCover: false,
+      coverObject: null
+    };
+    
+    switch(type) {
+      case 'soldier':
+        Object.assign(baseEnemy, { range: 200, fireRate: 1, reward: 50 });
+        break;
+      case 'sniper':
+        Object.assign(baseEnemy, { range: 400, fireRate: 3, damage: baseEnemy.damage * 2, reward: 150 });
+        break;
+      case 'grenadier':
+        Object.assign(baseEnemy, { range: 150, fireRate: 4, canThrowGrenades: true, reward: 100 });
+        break;
+      case 'heavy':
+        Object.assign(baseEnemy, { range: 150, fireRate: 0.8, health: baseEnemy.health * 2, reward: 200 });
+        break;
+      case 'commando':
+        Object.assign(baseEnemy, { range: 250, fireRate: 1.2, speed: baseEnemy.speed * 1.5, reward: 250 });
+        break;
     }
     
-    gameLoop();
-})();
+    return baseEnemy;
+  }
+  
+  start() {
+    this.isRunning = true;
+    this.lastTime = performance.now();
+    this.gameLoop(this.lastTime);
+  }
+  
+  stop() { this.isRunning = false; }
+  
+  gameLoop(currentTime) {
+    if (!this.isRunning) return;
+    const deltaTime = (currentTime - this.lastTime) / 1000;
+    this.lastTime = currentTime;
+    this.update(deltaTime);
+    this.render();
+    requestAnimationFrame((time) => this.gameLoop(time));
+  }
+  
+  update(deltaTime) {
+    this.gameState.time += deltaTime;
+    
+    this.handlePlayerInput();
+    this.updatePhysics(deltaTime);
+    this.handleShooting();
+    this.handleGrenades();
+    this.updateBullets(deltaTime);
+    this.updateEnemies(deltaTime);
+    this.updateCoverObjects();
+    this.updateExplosions(deltaTime);
+    this.updateParticles(deltaTime);
+    this.checkWaveCompletion();
+    
+    if (this.gameState.players.every(p => p.health <= 0)) {
+      this.gameState.status = 'gameover';
+    }
+  }
+  
+  handlePlayerInput() {
+    this.gameState.players.forEach(player => {
+      const input = this.getPlayerInput(player.name);
+      
+      if (input.cover && !player.inCover) {
+        this.enterCover(player);
+      } else if (!input.cover && player.inCover) {
+        this.exitCover(player);
+      }
+      
+      if (!player.inCover) {
+        let moveX = 0;
+        if (input.left) moveX -= 1;
+        if (input.right) moveX += 1;
+        
+        player.vx = moveX * player.speed;
+        
+        if (input.up) player.vy = -player.speed * 0.7;
+        else if (input.down) player.vy = player.speed * 0.7;
+        else player.vy = 0;
+        
+        player.facing = moveX !== 0 ? moveX : player.facing;
+      } else {
+        player.vx = 0;
+        player.vy = 0;
+        
+        if (input.left) player.facing = -1;
+        if (input.right) player.facing = 1;
+      }
+      
+      if (input.action && player.ammo > 0 && player.reloadTimer <= 0) {
+        this.fireBullet(player);
+        player.ammo--;
+        player.lastShot = this.gameState.time;
+      }
+      
+      if (input.grenade && player.grenades > 0 && this.gameState.time - player.lastGrenade > 1) {
+        this.throwGrenade(player);
+        player.grenades--;
+        player.lastGrenade = this.gameState.time;
+      }
+      
+      if (player.reloadTimer > 0) {
+        player.reloadTimer -= 0.016;
+      }
+      
+      if (player.ammo === 0 && player.reloadTimer <= 0) {
+        player.reloadTimer = 2;
+        player.ammo = player.maxAmmo;
+      }
+    });
+  }
+  
+  enterCover(player) {
+    this.gameState.coverObjects.forEach(cover => {
+      const dx = player.x - cover.x;
+      const dy = player.y - cover.y;
+      
+      if (Math.abs(dx) < cover.width / 2 + player.radius && Math.abs(dy) < cover.height / 2 + player.radius) {
+        player.inCover = true;
+        player.coverObject = cover;
+        player.y = cover.y + cover.height / 2 + player.radius;
+        return;
+      }
+    });
+  }
+  
+  exitCover(player) {
+    player.inCover = false;
+    player.coverObject = null;
+  }
+  
+  fireBullet(player) {
+    const angle = player.facing > 0 ? 0 : Math.PI;
+    const spread = (Math.random() - 0.5) * 0.2;
+    
+    this.gameState.bullets.push({
+      x: player.x + player.facing * 20,
+      y: player.y,
+      vx: Math.cos(angle + spread) * 15,
+      vy: Math.sin(angle + spread) * 15,
+      radius: 3,
+      damage: 15 + this.gameState.wave * 3,
+      fromPlayer: true,
+      playerName: player.name
+    });
+    
+    this.createMuzzleFlash(player.x + player.facing * 20, player.y);
+  }
+  
+  throwGrenade(player) {
+    const throwAngle = player.facing > 0 ? Math.PI / 4 : Math.PI * 0.75;
+    
+    this.gameState.grenades.push({
+      x: player.x,
+      y: player.y,
+      vx: Math.cos(throwAngle) * 8,
+      vy: -8,
+      radius: 6,
+      timer: 2,
+      thrownBy: player.name
+    });
+  }
+  
+  handleGrenades() {
+    this.gameState.grenades = this.gameState.grenades.filter(grenade => {
+      grenade.timer -= 0.016;
+      
+      if (grenade.timer <= 0) {
+        this.createExplosion(grenade.x, grenade.y, 60, 40);
+        return false;
+      }
+      
+      grenade.x += grenade.vx;
+      grenade.y += grenade.vy;
+      grenade.vy += 0.3;
+      
+      if (grenade.y > this.canvas.height - 80) {
+        grenade.y = this.canvas.height - 80;
+        grenade.vy *= -0.5;
+        grenade.vx *= 0.8;
+      }
+      
+      return true;
+    });
+  }
+  
+  createExplosion(x, y, radius, damage) {
+    this.gameState.explosions.push({
+      x, y,
+      radius: 0,
+      maxRadius: radius,
+      life: 0.5,
+      damage: damage
+    });
+    
+    this.gameState.enemies.forEach(enemy => {
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < radius) {
+        enemy.health -= damage * (1 - dist / radius);
+        enemy.hitStun = 0.5;
+      }
+    });
+    
+    this.gameState.players.forEach(player => {
+      const dx = player.x - x;
+      const dy = player.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < radius && !player.inCover) {
+        player.health -= damage * (1 - dist / radius) * 0.5;
+      }
+    });
+    
+    this.gameState.coverObjects.forEach(cover => {
+      const dx = cover.x - x;
+      const dy = cover.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < radius + 30) {
+        cover.health -= damage * (1 - dist / radius);
+      }
+    });
+    
+    for (let i = 0; i < 30; i++) {
+      this.gameState.particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 15,
+        vy: (Math.random() - 0.5) * 15,
+        life: 1,
+        color: ['#e74c3c', '#f39c12', '#e67e22'][Math.floor(Math.random() * 3)],
+        size: 5 + Math.random() * 5
+      });
+    }
+  }
+  
+  updateBullets(deltaTime) {
+    this.gameState.bullets = this.gameState.bullets.filter(bullet => {
+      bullet.x += bullet.vx;
+      bullet.y += bullet.vy;
+      
+      if (bullet.x < 0 || bullet.x > this.canvas.width || bullet.y < 0 || bullet.y > this.canvas.height) {
+        return false;
+      }
+      
+      if (bullet.fromPlayer) {
+        this.gameState.enemies.forEach(enemy => {
+          if (enemy.hitStun > 0) return;
+          
+          const dx = enemy.x - bullet.x;
+          const dy = enemy.y - bullet.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < enemy.radius + bullet.radius) {
+            enemy.health -= bullet.damage;
+            enemy.hitStun = 0.2;
+            
+            this.gameState.score += bullet.damage;
+            
+            for (let i = 0; i < 8; i++) {
+              this.gameState.particles.push({
+                x: bullet.x,
+                y: bullet.y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.5) * 6,
+                life: 0.4,
+                color: '#e74c3c',
+                size: 2
+              });
+            }
+            
+            return false;
+          }
+        });
+        
+        this.gameState.coverObjects.forEach(cover => {
+          if (bullet.x > cover.x - cover.width / 2 &&
+              bullet.x < cover.x + cover.width / 2 &&
+              bullet.y > cover.y - cover.height / 2 &&
+              bullet.y < cover.y + cover.height / 2) {
+            cover.health -= bullet.damage * 0.5;
+            return false;
+          }
+        });
+      } else {
+        this.gameState.players.forEach(player => {
+          if (player.health <= 0 || player.inCover) return;
+          
+          const dx = player.x - bullet.x;
+          const dy = player.y - bullet.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < player.radius + bullet.radius) {
+            player.health -= bullet.damage;
+            
+            for (let i = 0; i < 8; i++) {
+              this.gameState.particles.push({
+                x: bullet.x,
+                y: bullet.y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.5) * 6,
+                life: 0.4,
+                color: '#e74c3c',
+                size: 2
+              });
+            }
+            
+            return false;
+          }
+        });
+      }
+      
+      return true;
+    });
+  }
+  
+  updatePhysics(deltaTime) {
+    const groundY = this.canvas.height - 80;
+    
+    this.gameState.players.forEach(player => {
+      player.x += player.vx;
+      player.y += player.vy;
+      
+      player.x = Math.max(player.radius, Math.min(this.canvas.width - player.radius, player.x));
+      player.y = Math.max(player.radius, Math.min(groundY, player.y));
+    });
+    
+    this.gameState.enemies.forEach(enemy => {
+      enemy.x += enemy.vx;
+      enemy.y += enemy.vy;
+      
+      enemy.x = Math.max(enemy.radius, Math.min(this.canvas.width - enemy.radius, enemy.x));
+      enemy.y = Math.max(enemy.radius, Math.min(groundY, enemy.y));
+    });
+  }
+  
+  handleShooting() {
+    this.gameState.enemies.forEach(enemy => {
+      if (enemy.hitStun > 0) {
+        enemy.hitStun -= 0.016;
+        return;
+      }
+      
+      if (enemy.attackCooldown > 0) {
+        enemy.attackCooldown -= 0.016;
+      }
+      
+      const targetPlayer = this.findTargetPlayer(enemy);
+      if (!targetPlayer) return;
+      
+      const dx = targetPlayer.x - enemy.x;
+      const dy = targetPlayer.y - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < enemy.range && enemy.attackCooldown <= 0) {
+        this.enemyFire(enemy, targetPlayer);
+        enemy.attackCooldown = enemy.fireRate;
+      }
+      
+      if (dist > enemy.range * 0.7) {
+        enemy.vx = Math.sign(dx) * enemy.speed;
+      } else {
+        enemy.vx = 0;
+      }
+    });
+  }
+  
+  findTargetPlayer(enemy) {
+    let target = null;
+    let minDist = Infinity;
+    
+    this.gameState.players.forEach(player => {
+      if (player.health <= 0) return;
+      
+      const dx = player.x - enemy.x;
+      const dy = player.y - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < minDist) {
+        minDist = dist;
+        target = player;
+      }
+    });
+    
+    return target;
+  }
+  
+  enemyFire(enemy, target) {
+    const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+    const spread = (Math.random() - 0.5) * (1 - enemy.accuracy);
+    
+    this.gameState.bullets.push({
+      x: enemy.x,
+      y: enemy.y,
+      vx: Math.cos(angle + spread) * 12,
+      vy: Math.sin(angle + spread) * 12,
+      radius: 3,
+      damage: enemy.damage,
+      fromPlayer: false
+    });
+  }
+  
+  updateEnemies(deltaTime) {
+    this.gameState.enemies = this.gameState.enemies.filter(enemy => {
+      if (enemy.health <= 0) {
+        this.gameState.score += enemy.reward || 50;
+        
+        if (Math.random() > 0.7) {
+          this.gameState.players.forEach(p => {
+            if (p.ammo < p.maxAmmo) {
+              p.ammo += 10;
+            }
+          });
+        }
+        
+        for (let i = 0; i < 15; i++) {
+          this.gameState.particles.push({
+            x: enemy.x,
+            y: enemy.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 0.8,
+            color: '#5d6d7e',
+            size: 4
+          });
+        }
+        
+        return false;
+      }
+      
+      return true;
+    });
+  }
+  
+  updateCoverObjects() {
+    this.gameState.coverObjects = this.gameState.coverObjects.filter(cover => {
+      return cover.health > 0;
+    });
+  }
+  
+  updateExplosions(deltaTime) {
+    this.gameState.explosions = this.gameState.explosions.filter(exp => {
+      exp.life -= deltaTime;
+      exp.radius += (exp.maxRadius - exp.radius) * 0.2;
+      return exp.life > 0;
+    });
+  }
+  
+  updateParticles(deltaTime) {
+    this.gameState.particles = this.gameState.particles.filter(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.2;
+      p.life -= deltaTime;
+      return p.life > 0;
+    });
+  }
+  
+  createMuzzleFlash(x, y) {
+    for (let i = 0; i < 5; i++) {
+      this.gameState.particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        life: 0.1,
+        color: '#f1c40f',
+        size: 3
+      });
+    }
+  }
+  
+  checkWaveCompletion() {
+    if (this.gameState.enemies.length === 0 && this.gameState.status === 'playing') {
+      this.gameState.wave++;
+      setTimeout(() => this.spawnWave(), 2000);
+    }
+  }
+  
+  getPlayerInput(name) {
+    return window.gameState && window.gameState[name] ? window.gameState[name].input || {} : {};
+  }
+  
+  render() {
+    this.ctx.fillStyle = '#2c3e50';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.drawBackground();
+    this.drawGround();
+    this.drawCoverObjects();
+    this.drawEnemies();
+    this.drawPlayers();
+    this.drawBullets();
+    this.drawGrenades();
+    this.drawExplosions();
+    this.drawParticles();
+    this.drawUI();
+    
+    if (this.gameState.status === 'gameover') {
+      this.drawGameOver();
+    }
+  }
+  
+  drawBackground() {
+    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height * 0.7);
+    gradient.addColorStop(0, '#34495e');
+    gradient.addColorStop(1, '#2c3e50');
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height * 0.7);
+    
+    for (let i = 0; i < 20; i++) {
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(50 + i * 60, 20, 40, 80);
+      this.ctx.fillStyle = '#1a252f';
+      this.ctx.fillRect(55 + i * 60, 30, 12, 25);
+      this.ctx.fillRect(75 + i * 60, 30, 12, 25);
+    }
+  }
+  
+  drawGround() {
+    this.ctx.fillStyle = '#1a252f';
+    this.ctx.fillRect(0, this.canvas.height - 80, this.canvas.width, 80);
+    
+    this.ctx.fillStyle = '#27ae60';
+    this.ctx.fillRect(0, this.canvas.height - 80, this.canvas.width, 5);
+  }
+  
+  drawCoverObjects() {
+    this.gameState.coverObjects.forEach(cover => {
+      if (cover.type === 'crate') {
+        this.ctx.fillStyle = '#8b4513';
+        this.ctx.fillRect(cover.x - cover.width / 2, cover.y - cover.height / 2, cover.width, cover.height);
+        
+        this.ctx.strokeStyle = '#5d4037';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(cover.x - cover.width / 2, cover.y - cover.height / 2, cover.width, cover.height);
+      } else if (cover.type === 'building') {
+        this.ctx.fillStyle = '#34495e';
+        this.ctx.fillRect(cover.x - cover.width / 2, cover.y - cover.height / 2, cover.width, cover.height);
+        
+        for (let wx = 0; wx < 3; wx++) {
+          for (let wy = 0; wy < 4; wy++) {
+            this.ctx.fillStyle = '#2c3e50';
+            this.ctx.fillRect(cover.x - cover.width / 2 + 10 + wx * 30, cover.y - cover.height / 2 + 10 + wy * 25, 20, 15);
+          }
+        }
+      }
+    });
+  }
+  
+  drawEnemies() {
+    this.gameState.enemies.forEach(enemy => {
+      this.ctx.fillStyle = enemy.color;
+      this.ctx.beginPath();
+      this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      if (enemy.hitStun > 0) {
+        this.ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        this.ctx.beginPath();
+        this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      
+      this.ctx.fillStyle = '#f39c12';
+      this.ctx.beginPath();
+      this.ctx.arc(enemy.x + 5, enemy.y - 5, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      const healthPercent = enemy.health / enemy.maxHealth;
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(enemy.x - 15, enemy.y - 25, 30, 4);
+      this.ctx.fillStyle = '#e74c3c';
+      this.ctx.fillRect(enemy.x - 15, enemy.y - 25, 30 * healthPercent, 4);
+    });
+  }
+  
+  drawPlayers() {
+    this.gameState.players.forEach(player => {
+      if (player.health <= 0) return;
+      
+      this.ctx.fillStyle = player.color;
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      this.ctx.fillStyle = '#fff';
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      this.ctx.stroke();
+      
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(player.x + player.facing * 10, player.y - 5, 15, 4);
+      
+      if (player.inCover) {
+        this.ctx.strokeStyle = '#2ecc71';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(player.x, player.y, player.radius + 5, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+      
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = '10px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(player.name.substring(0, 5), player.x, player.y - player.radius - 8);
+    });
+  }
+  
+  drawBullets() {
+    this.gameState.bullets.forEach(bullet => {
+      this.ctx.fillStyle = bullet.fromPlayer ? '#f1c40f' : '#e74c3c';
+      this.ctx.beginPath();
+      this.ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+  }
+  
+  drawGrenades() {
+    this.gameState.grenades.forEach(grenade => {
+      this.ctx.fillStyle = '#27ae60';
+      this.ctx.beginPath();
+      this.ctx.arc(grenade.x, grenade.y, grenade.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      const pulse = Math.sin(this.gameState.time * 10) * 0.3 + 0.7;
+      this.ctx.fillStyle = `rgba(231, 76, 60, ${pulse})`;
+      this.ctx.beginPath();
+      this.ctx.arc(grenade.x, grenade.y, grenade.radius + 3, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+  }
+  
+  drawExplosions() {
+    this.gameState.explosions.forEach(exp => {
+      const gradient = this.ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, exp.radius);
+      gradient.addColorStop(0, 'rgba(241, 196, 15, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(230, 126, 34, 0.6)');
+      gradient.addColorStop(1, 'rgba(192, 57, 43, 0)');
+      
+      this.ctx.fillStyle = gradient;
+      this.ctx.beginPath();
+      this.ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+  }
+  
+  drawParticles() {
+    this.gameState.particles.forEach(p => {
+      this.ctx.globalAlpha = p.life;
+      this.ctx.fillStyle = p.color;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+    this.ctx.globalAlpha = 1;
+  }
+  
+  drawUI() {
+    this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    this.ctx.fillRect(10, 10, 180, 70);
+    
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = 'bold 16px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`Wave: ${this.gameState.wave}`, 20, 30);
+    this.ctx.fillText(`Score: ${this.gameState.score}`, 20, 50);
+    this.ctx.fillText(`Enemies: ${this.gameState.enemies.length}`, 20, 70);
+    
+    this.gameState.players.forEach((player, i) => {
+      const y = this.canvas.height - 80 - i * 50;
+      
+      this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      this.ctx.fillRect(10, y, 180, 45);
+      
+      this.ctx.fillStyle = player.color;
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText(player.name, 20, y + 15);
+      
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(20, y + 22, 120, 8);
+      this.ctx.fillStyle = '#e74c3c';
+      this.ctx.fillRect(20, y + 22, 120 * (player.health / player.maxHealth), 8);
+      
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(20, y + 34, 80, 6);
+      this.ctx.fillStyle = '#f1c40f';
+      this.ctx.fillRect(20, y + 34, 80 * (player.ammo / player.maxAmmo), 6);
+      
+      this.ctx.fillStyle = '#95a5a6';
+      this.ctx.font = '10px Arial';
+      this.ctx.fillText(`G: ${player.grenades}`, 110, y + 40);
+    });
+  }
+  
+  drawGameOver() {
+    this.ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.ctx.fillStyle = '#e74c3c';
+    this.ctx.font = 'bold 60px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
+    
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '30px Arial';
+    this.ctx.fillText(`Waves: ${this.gameState.wave}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+    this.ctx.fillText(`Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2 + 60);
+  }
+  
+  updatePlayerInput(name, input) {
+    window.gameState = window.gameState || {};
+    window.gameState[name] = { input: input };
+  }
+}
+
+window.UrbanWarfareGame = UrbanWarfareGame;

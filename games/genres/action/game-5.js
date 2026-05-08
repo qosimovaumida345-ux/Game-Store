@@ -1,5 +1,5 @@
-// Stealth Action Game
-class StealthGame {
+// City Siege - Urban Siege Warfare Action Game
+class CitySiegeGame {
   constructor(canvas, players, gameId) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -14,16 +14,17 @@ class StealthGame {
     this.gameState = {
       time: 0,
       score: 0,
-      detected: false,
-      detectionLevel: 0,
-      stealthKills: 0,
-      status: 'sneaking',
-      player: null,
-      guards: [],
-      objectives: [],
-      obstacles: [],
-      camera: null,
-      gameOver: false
+      wave: 1,
+      status: 'playing',
+      siegeProgress: 0,
+      players: [],
+      defenders: [],
+      attackers: [],
+      barricades: [],
+      vehicles: [],
+      bullets: [],
+      explosions: [],
+      particles: []
     };
     
     this.initGame();
@@ -35,38 +36,85 @@ class StealthGame {
   }
   
   initGame() {
-    this.gameState.player = {
-      x: 80,
-      y: 300,
-      width: 20,
-      height: 30,
-      speed: 2.5,
-      visible: true,
-      crouching: false
-    };
+    this.createSiegeMap();
     
-    this.gameState.guards = [
-      { x: 300, y: 200, angle: 0, fov: Math.PI / 3, range: 150, patrol: true, patrolDir: 1, idle: false },
-      { x: 500, y: 400, angle: Math.PI, fov: Math.PI / 3, range: 150, patrol: true, patrolDir: -1, idle: false },
-      { x: 600, y: 150, angle: Math.PI / 2, fov: Math.PI / 4, range: 200, patrol: false, idle: true },
-      { x: 350, y: 450, angle: -Math.PI / 2, fov: Math.PI / 3, range: 150, patrol: true, patrolDir: 1, idle: false }
-    ];
+    this.players.forEach((p, i) => {
+      this.gameState.players.push({
+        name: p,
+        x: 80 + i * 100,
+        y: this.canvas.height - 150,
+        vx: 0,
+        vy: 0,
+        speed: 4,
+        radius: 18,
+        health: 100,
+        maxHealth: 100,
+        ammo: 30,
+        maxAmmo: 30,
+        weapon: 'assault',
+        lastShot: 0,
+        barricadeHealth: 0,
+        color: ['#c0392b', '#2980b9', '#16a085', '#8e44ad'][i % 4]
+      });
+    });
     
-    this.gameState.objectives = [
-      { x: 700, y: 100, collected: false },
-      { x: 500, y: 300, collected: false },
-      { x: 200, y: 500, collected: false }
-    ];
+    this.spawnDefenders(5);
+    this.spawnWave();
+  }
+  
+  createSiegeMap() {
+    for (let i = 0; i < 8; i++) {
+      this.gameState.barricades.push({
+        x: 200 + i * 80,
+        y: this.canvas.height - 120,
+        width: 40,
+        height: 60,
+        health: 100,
+        maxHealth: 100
+      });
+    }
     
-    this.gameState.obstacles = [
-      { x: 200, y: 150, width: 80, height: 60 },
-      { x: 400, y: 300, width: 100, height: 40 },
-      { x: 600, y: 400, width: 60, height: 80 },
-      { x: 150, y: 400, width: 50, height: 50 },
-      { x: 550, y: 200, width: 70, height: 50 }
-    ];
+    this.gameState.vehicles.push(
+      { x: 100, y: this.canvas.height - 160, type: 'tank', health: 300, maxHealth: 300, active: true },
+      { x: this.canvas.width - 100, y: this.canvas.height - 160, type: 'apc', health: 200, maxHealth: 200, active: true }
+    );
+  }
+  
+  spawnDefenders(count) {
+    for (let i = 0; i < count; i++) {
+      this.gameState.defenders.push({
+        x: 300 + Math.random() * (this.canvas.width - 600),
+        y: this.canvas.height - 150,
+        vx: 0,
+        radius: 15,
+        health: 50 + this.gameState.wave * 15,
+        maxHealth: 50 + this.gameState.wave * 15,
+        damage: 10 + this.gameState.wave * 3,
+        attackCooldown: 0,
+        type: 'soldier'
+      });
+    }
+  }
+  
+  spawnWave() {
+    const count = 2 + this.gameState.wave * 2;
     
-    this.gameState.camera = { x: 0, y: 0 };
+    for (let i = 0; i < count; i++) {
+      const side = Math.random() > 0.5 ? 1 : -1;
+      
+      this.gameState.attackers.push({
+        x: side > 0 ? this.canvas.width + 30 : -30,
+        y: this.canvas.height - 150,
+        vx: 0,
+        radius: 15,
+        health: 40 + this.gameState.wave * 10,
+        maxHealth: 40 + this.gameState.wave * 10,
+        damage: 8 + this.gameState.wave * 2,
+        speed: 2 + Math.random(),
+        attackCooldown: 0,
+        type: 'militant'
+      });
+    }
   }
   
   start() {
@@ -87,307 +135,603 @@ class StealthGame {
   }
   
   update(deltaTime) {
-    if (this.gameState.gameOver) return;
-    
     this.gameState.time += deltaTime;
     
-    this.updatePlayer(deltaTime);
-    this.updateGuards(deltaTime);
-    this.checkDetection();
-    this.checkObjective();
-    this.updateCamera();
-  }
-  
-  updatePlayer(deltaTime) {
-    const input = this.getPlayerInput(this.players[0]);
-    const player = this.gameState.player;
+    this.handlePlayerInput();
+    this.updatePhysics(deltaTime);
+    this.handleShooting();
+    this.updateBullets(deltaTime);
+    this.updateDefenders(deltaTime);
+    this.updateAttackers(deltaTime);
+    this.updateBarricades();
+    this.updateVehicles();
+    this.updateExplosions(deltaTime);
+    this.updateParticles(deltaTime);
+    this.checkWaveCompletion();
+    this.checkVictoryCondition();
     
-    if (input.b) player.crouching = true;
-    else player.crouching = false;
-    
-    const speed = player.crouching ? player.speed * 0.5 : player.speed;
-    
-    let vx = 0, vy = 0;
-    if (input.left) vx = -speed;
-    if (input.right) vx = speed;
-    if (input.up) vy = -speed;
-    if (input.down) vy = speed;
-    
-    let newX = player.x + vx;
-    let newY = player.y + vy;
-    
-    this.gameState.obstacles.forEach(obs => {
-      if (newX + player.width/2 > obs.x && newX - player.width/2 < obs.x + obs.width &&
-          newY + player.height/2 > obs.y && newY - player.height/2 < obs.y + obs.height) {
-        newX = player.x;
-        newY = player.y;
-      }
-    });
-    
-    player.x = Math.max(30, Math.min(this.canvas.width - 30, newX));
-    player.y = Math.max(50, Math.min(this.canvas.height - 50, newY));
-    
-    if (input.action && player.crouching) {
-      this.attemptStealthKill();
+    if (this.gameState.players.every(p => p.health <= 0)) {
+      this.gameState.status = 'gameover';
     }
   }
   
-  attemptStealthKill() {
-    const player = this.gameState.player;
+  handlePlayerInput() {
+    this.gameState.players.forEach(player => {
+      const input = this.getPlayerInput(player.name);
+      
+      let moveX = 0;
+      if (input.left) moveX -= 1;
+      if (input.right) moveX += 1;
+      
+      player.vx = moveX * player.speed;
+      
+      if (input.up) player.vy = -player.speed * 0.7;
+      else if (input.down) player.vy = player.speed * 0.7;
+      else player.vy = 0;
+      
+      if (input.action && player.ammo > 0 && this.gameState.time - player.lastShot > 0.1) {
+        this.fireBullet(player);
+        player.ammo--;
+        player.lastShot = this.gameState.time;
+      }
+    });
+  }
+  
+  fireBullet(player) {
+    const target = this.findNearestEnemy(player);
+    let vx = player.vx > 0 ? 15 : -15;
+    let vy = 0;
     
-    this.gameState.guards.forEach(guard => {
-      const dx = guard.x - player.x;
-      const dy = guard.y - player.y;
+    if (target) {
+      const angle = Math.atan2(target.y - player.y, target.x - player.x);
+      vx = Math.cos(angle) * 15;
+      vy = Math.sin(angle) * 15;
+    }
+    
+    this.gameState.bullets.push({
+      x: player.x,
+      y: player.y - 10,
+      vx: vx,
+      vy: vy,
+      radius: 3,
+      damage: 15 + this.gameState.wave * 3,
+      fromPlayer: true,
+      playerName: player.name
+    });
+  }
+  
+  findNearestEnemy(player) {
+    let nearest = null;
+    let minDist = Infinity;
+    
+    [...this.gameState.defenders, ...this.gameState.attackers].forEach(enemy => {
+      if (enemy.health <= 0) return;
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = enemy;
+      }
+    });
+    
+    return nearest;
+  }
+  
+  updatePhysics(deltaTime) {
+    const groundY = this.canvas.height - 100;
+    
+    this.gameState.players.forEach(player => {
+      player.x += player.vx;
+      player.y += player.vy;
+      
+      player.x = Math.max(player.radius, Math.min(this.canvas.width - player.radius, player.x));
+      player.y = Math.max(player.radius, Math.min(groundY, player.y));
+    });
+  }
+  
+  handleShooting() {
+    this.gameState.defenders.forEach(defender => {
+      if (defender.attackCooldown > 0) {
+        defender.attackCooldown -= 0.016;
+        return;
+      }
+      
+      const targetPlayer = this.findNearestTarget(defender);
+      if (!targetPlayer) return;
+      
+      const dx = targetPlayer.x - defender.x;
+      const dy = targetPlayer.y - defender.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
-      if (dist < 40) {
-        guard.dead = true;
-        this.gameState.stealthKills++;
+      if (dist < 250) {
+        this.fireEnemyBullet(defender, targetPlayer);
+        defender.attackCooldown = 1.2;
+      }
+    });
+    
+    this.gameState.attackers.forEach(attacker => {
+      if (attacker.attackCooldown > 0) {
+        attacker.attackCooldown -= 0.016;
+      }
+      
+      const targetPlayer = this.findNearestTarget(attacker);
+      if (!targetPlayer) return;
+      
+      const dx = targetPlayer.x - attacker.x;
+      const dy = targetPlayer.y - attacker.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < 200 && attacker.attackCooldown <= 0) {
+        this.fireEnemyBullet(attacker, targetPlayer);
+        attacker.attackCooldown = 1;
+      } else if (dist > 180) {
+        attacker.vx = Math.sign(dx) * attacker.speed;
+      } else {
+        attacker.vx = 0;
+      }
+    });
+  }
+  
+  findNearestTarget(unit) {
+    let target = null;
+    let minDist = Infinity;
+    
+    this.gameState.players.forEach(player => {
+      if (player.health <= 0) return;
+      const dx = player.x - unit.x;
+      const dy = player.y - unit.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        target = player;
+      }
+    });
+    
+    return target;
+  }
+  
+  fireEnemyBullet(enemy, target) {
+    const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+    const spread = (Math.random() - 0.5) * 0.2;
+    
+    this.gameState.bullets.push({
+      x: enemy.x,
+      y: enemy.y - 10,
+      vx: Math.cos(angle + spread) * 12,
+      vy: Math.sin(angle + spread) * 12,
+      radius: 3,
+      damage: enemy.damage,
+      fromPlayer: false
+    });
+  }
+  
+  updateBullets(deltaTime) {
+    this.gameState.bullets = this.gameState.bullets.filter(bullet => {
+      bullet.x += bullet.vx;
+      bullet.y += bullet.vy;
+      
+      if (bullet.x < 0 || bullet.x > this.canvas.width || bullet.y < 0 || bullet.y > this.canvas.height) {
+        return false;
+      }
+      
+      if (bullet.fromPlayer) {
+        [...this.gameState.defenders, ...this.gameState.attackers].forEach(enemy => {
+          if (enemy.health <= 0) return;
+          const dx = enemy.x - bullet.x;
+          const dy = enemy.y - bullet.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < enemy.radius + bullet.radius) {
+            enemy.health -= bullet.damage;
+            this.gameState.score += bullet.damage;
+            
+            for (let i = 0; i < 6; i++) {
+              this.gameState.particles.push({
+                x: bullet.x, y: bullet.y,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 0.3,
+                color: '#e74c3c',
+                size: 2
+              });
+            }
+            return false;
+          }
+        });
+        
+        this.gameState.barricades.forEach(barricade => {
+          if (bullet.x > barricade.x - barricade.width / 2 &&
+              bullet.x < barricade.x + barricade.width / 2 &&
+              bullet.y > barricade.y - barricade.height / 2 &&
+              bullet.y < barricade.y + barricade.height / 2) {
+            barricade.health -= bullet.damage * 0.5;
+            return false;
+          }
+        });
+      } else {
+        this.gameState.players.forEach(player => {
+          if (player.health <= 0) return;
+          const dx = player.x - bullet.x;
+          const dy = player.y - bullet.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < player.radius + bullet.radius) {
+            player.health -= bullet.damage;
+            return false;
+          }
+        });
+      }
+      
+      return true;
+    });
+  }
+  
+  updateDefenders(deltaTime) {
+    this.gameState.defenders = this.gameState.defenders.filter(defender => {
+      if (defender.health <= 0) {
+        this.gameState.score += 100;
+        this.gameState.siegeProgress += 10;
+        
+        for (let i = 0; i < 15; i++) {
+          this.gameState.particles.push({
+            x: defender.x, y: defender.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 0.6,
+            color: '#95a5a6',
+            size: 3
+          });
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+  
+  updateAttackers(deltaTime) {
+    this.gameState.attackers = this.gameState.attackers.filter(attacker => {
+      attacker.x += attacker.vx;
+      
+      if (attacker.health <= 0) {
+        this.gameState.score += 75;
+        
+        for (let i = 0; i < 12; i++) {
+          this.gameState.particles.push({
+            x: attacker.x, y: attacker.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 0.5,
+            color: '#d35400',
+            size: 3
+          });
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+  
+  updateBarricades() {
+    this.gameState.barricades = this.gameState.barricades.filter(barricade => {
+      return barricade.health > 0;
+    });
+  }
+  
+  updateVehicles() {
+    this.gameState.vehicles.forEach(vehicle => {
+      if (!vehicle.active) return;
+      
+      if (vehicle.health <= 0) {
+        vehicle.active = false;
+        this.createExplosion(vehicle.x, vehicle.y, 80, 50);
         this.gameState.score += 200;
       }
     });
-    
-    this.gameState.guards = this.gameState.guards.filter(g => !g.dead);
   }
   
-  updateGuards(deltaTime) {
-    this.gameState.guards.forEach(guard => {
-      if (guard.patrol) {
-        guard.x += guard.patrolDir * 0.5;
-        
-        if (guard.x < 150 || guard.x > 650) {
-          guard.patrolDir *= -1;
-          guard.angle = guard.patrolDir > 0 ? 0 : Math.PI;
-        }
-      }
-      
-      if (guard.idle) {
-        guard.angle += Math.sin(this.gameState.time * 2) * 0.02;
-      }
+  createExplosion(x, y, radius, damage) {
+    this.gameState.explosions.push({
+      x, y,
+      radius: 0,
+      maxRadius: radius,
+      life: 0.6
     });
-  }
-  
-  checkDetection() {
-    const player = this.gameState.player;
     
-    this.gameState.guards.forEach(guard => {
-      const dx = player.x - guard.x;
-      const dy = player.y - guard.y;
+    [...this.gameState.defenders, ...this.gameState.attackers].forEach(enemy => {
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < guard.range) {
-        const angleToPlayer = Math.atan2(dy, dx);
-        let angleDiff = angleToPlayer - guard.angle;
-        
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        
-        if (Math.abs(angleDiff) < guard.fov / 2) {
-          let visibility = 1;
-          
-          this.gameState.obstacles.forEach(obs => {
-            if (this.lineIntersectsObstacle(guard.x, guard.y, player.x, player.y, obs)) {
-              visibility = 0;
-            }
-          });
-          
-          if (player.crouching) visibility *= 0.5;
-          
-          this.gameState.detectionLevel += visibility * deltaTime * 0.5;
-        }
+      if (dist < radius) {
+        enemy.health -= damage * (1 - dist / radius);
       }
     });
     
-    if (this.gameState.detectionLevel >= 10) {
-      this.gameState.gameOver = true;
-      this.gameState.detected = true;
-    }
-    
-    this.gameState.detectionLevel = Math.max(0, this.gameState.detectionLevel - deltaTime * 0.3);
-  }
-  
-  lineIntersectsObstacle(x1, y1, x2, y2, obs) {
-    const left = obs.x;
-    const right = obs.x + obs.width;
-    const top = obs.y;
-    const bottom = obs.y + obs.height;
-    
-    return (x1 > left && x1 < right && y1 > top && y1 < bottom) ||
-           (x2 > left && x2 < right && y2 > top && y2 < bottom);
-  }
-  
-  checkObjective() {
-    const player = this.gameState.player;
-    
-    this.gameState.objectives.forEach(obj => {
-      if (obj.collected) return;
-      
-      const dx = player.x - obj.x;
-      const dy = player.y - obj.y;
+    this.gameState.players.forEach(player => {
+      const dx = player.x - x;
+      const dy = player.y - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < 30) {
-        obj.collected = true;
-        this.gameState.score += 100;
+      if (dist < radius) {
+        player.health -= damage * (1 - dist / radius) * 0.5;
       }
     });
     
-    const allCollected = this.gameState.objectives.every(o => o.collected);
-    if (allCollected) {
-      this.gameState.score += 500;
-      this.gameState.gameOver = true;
+    for (let i = 0; i < 30; i++) {
+      this.gameState.particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 15,
+        vy: (Math.random() - 0.5) * 15,
+        life: 0.8,
+        color: ['#e74c3c', '#f39c12', '#e67e22'][Math.floor(Math.random() * 3)],
+        size: 4 + Math.random() * 6
+      });
     }
   }
   
-  updateCamera() {
-    const player = this.gameState.player;
-    const cam = this.gameState.camera;
-    
-    cam.x += (player.x - cam.x) * 0.1;
-    cam.y += (player.y - cam.y) * 0.1;
+  updateExplosions(deltaTime) {
+    this.gameState.explosions = this.gameState.explosions.filter(exp => {
+      exp.life -= deltaTime;
+      exp.radius += (exp.maxRadius - exp.radius) * 0.2;
+      return exp.life > 0;
+    });
   }
   
-  getPlayerInput(playerName) {
-    return window.gameState && window.gameState[playerName] ? window.gameState[playerName].input || {} : {};
+  updateParticles(deltaTime) {
+    this.gameState.particles = this.gameState.particles.filter(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.life -= deltaTime;
+      return p.life > 0;
+    });
+  }
+  
+  checkWaveCompletion() {
+    if (this.gameState.attackers.length === 0 && this.gameState.status === 'playing') {
+      this.gameState.wave++;
+      setTimeout(() => this.spawnWave(), 2000);
+    }
+  }
+  
+  checkVictoryCondition() {
+    if (this.gameState.siegeProgress >= 100) {
+      this.gameState.status = 'victory';
+    }
+  }
+  
+  getPlayerInput(name) {
+    return window.gameState && window.gameState[name] ? window.gameState[name].input || {} : {};
   }
   
   render() {
+    this.ctx.fillStyle = '#34495e';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
     this.drawBackground();
-    this.drawObstacles();
-    this.drawObjectives();
-    this.drawGuards();
-    this.drawPlayer();
-    this.drawDetectionMeter();
+    this.drawBuildings();
+    this.drawBarricades();
+    this.drawVehicles();
+    this.drawDefenders();
+    this.drawAttackers();
+    this.drawPlayers();
+    this.drawBullets();
+    this.drawExplosions();
+    this.drawParticles();
     this.drawUI();
-    if (this.gameState.gameOver) this.drawGameOver();
+    
+    if (this.gameState.status === 'gameover') {
+      this.drawGameOver();
+    } else if (this.gameState.status === 'victory') {
+      this.drawVictory();
+    }
   }
   
   drawBackground() {
-    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height * 0.7);
     gradient.addColorStop(0, '#2c3e50');
     gradient.addColorStop(1, '#34495e');
     this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    this.ctx.fillStyle = '#95a5a6';
-    this.ctx.fillRect(50, 50, 700, 30);
-    this.ctx.fillRect(50, 520, 700, 30);
-    
-    this.ctx.fillStyle = '#7f8c8d';
-    this.ctx.fillRect(50, 50, 30, 500);
-    this.ctx.fillRect(720, 50, 30, 500);
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height * 0.7);
   }
   
-  drawObstacles() {
-    this.gameState.obstacles.forEach(obs => {
-      this.ctx.fillStyle = '#5d6d7e';
-      this.ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+  drawBuildings() {
+    const buildings = [
+      { x: 100, y: 100, w: 80, h: 200 },
+      { x: 250, y: 150, w: 100, h: 180 },
+      { x: 400, y: 80, w: 120, h: 250 },
+      { x: 600, y: 120, w: 90, h: 200 },
+      { x: 700, y: 100, w: 80, h: 220 }
+    ];
+    
+    buildings.forEach(b => {
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(b.x, b.y, b.w, b.h);
       
-      this.ctx.fillStyle = '#4a5568';
-      this.ctx.fillRect(obs.x + 5, obs.y + 5, obs.width - 10, obs.height - 10);
+      this.ctx.fillStyle = '#f39c12';
+      for (let wy = 0; wy < 5; wy++) {
+        for (let wx = 0; wx < 3; wx++) {
+          if (Math.random() > 0.3) {
+            this.ctx.fillRect(b.x + 10 + wx * 30, b.y + 20 + wy * 40, 20, 25);
+          }
+        }
+      }
     });
   }
   
-  drawObjectives() {
-    this.gameState.objectives.forEach(obj => {
-      if (obj.collected) return;
+  drawBarricades() {
+    this.gameState.barricades.forEach(barricade => {
+      const healthPercent = barricade.health / barricade.maxHealth;
+      this.ctx.fillStyle = healthPercent > 0.5 ? '#8b4513' : '#5d4037';
+      this.ctx.fillRect(barricade.x - barricade.width / 2, barricade.y - barricade.height / 2, barricade.width, barricade.height);
       
-      this.ctx.fillStyle = '#f1c40f';
+      this.ctx.strokeStyle = '#5d4037';
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeRect(barricade.x - barricade.width / 2, barricade.y - barricade.height / 2, barricade.width, barricade.height);
+    });
+  }
+  
+  drawVehicles() {
+    this.gameState.vehicles.forEach(vehicle => {
+      if (!vehicle.active) return;
+      
+      if (vehicle.type === 'tank') {
+        this.ctx.fillStyle = '#4a5d4a';
+        this.ctx.fillRect(vehicle.x - 40, vehicle.y - 20, 80, 35);
+        this.ctx.fillStyle = '#2c2c2c';
+        this.ctx.fillRect(vehicle.x + 30, vehicle.y - 10, 30, 15);
+      } else if (vehicle.type === 'apc') {
+        this.ctx.fillStyle = '#5d4e37';
+        this.ctx.fillRect(vehicle.x - 35, vehicle.y - 15, 70, 30);
+        this.ctx.fillStyle = '#333';
+        this.ctx.beginPath();
+        this.ctx.arc(vehicle.x - 20, vehicle.y + 15, 8, 0, Math.PI * 2);
+        this.ctx.arc(vehicle.x + 20, vehicle.y + 15, 8, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    });
+  }
+  
+  drawDefenders() {
+    this.gameState.defenders.forEach(defender => {
+      this.ctx.fillStyle = '#7f8c8d';
       this.ctx.beginPath();
-      this.ctx.moveTo(obj.x, obj.y - 15);
-      this.ctx.lineTo(obj.x + 12, obj.y);
-      this.ctx.lineTo(obj.x, obj.y + 15);
-      this.ctx.lineTo(obj.x - 12, obj.y);
-      this.ctx.closePath();
+      this.ctx.arc(defender.x, defender.y, defender.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      this.ctx.fillStyle = '#3498db';
+      this.ctx.beginPath();
+      this.ctx.arc(defender.x + 5, defender.y - 5, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+  }
+  
+  drawAttackers() {
+    this.gameState.attackers.forEach(attacker => {
+      this.ctx.fillStyle = '#d35400';
+      this.ctx.beginPath();
+      this.ctx.arc(attacker.x, attacker.y, attacker.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      this.ctx.fillStyle = '#e74c3c';
+      this.ctx.beginPath();
+      this.ctx.arc(attacker.x + 5, attacker.y - 5, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+  }
+  
+  drawPlayers() {
+    this.gameState.players.forEach(player => {
+      if (player.health <= 0) return;
+      
+      this.ctx.fillStyle = player.color;
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
       this.ctx.fill();
       
       this.ctx.fillStyle = '#fff';
-      this.ctx.font = 'bold 10px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText('?', obj.x, obj.y + 4);
-    });
-  }
-  
-  drawGuards() {
-    this.gameState.guards.forEach(guard => {
-      this.ctx.fillStyle = '#e74c3c';
-      this.ctx.beginPath();
-      this.ctx.arc(guard.x, guard.y, 15, 0, Math.PI * 2);
-      this.ctx.fill();
+      this.ctx.stroke();
       
-      this.ctx.fillStyle = '#c0392b';
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(player.x - 8, player.y - 25, 16, 4);
+    });
+  }
+  
+  drawBullets() {
+    this.gameState.bullets.forEach(bullet => {
+      this.ctx.fillStyle = bullet.fromPlayer ? '#f1c40f' : '#e74c3c';
       this.ctx.beginPath();
-      this.ctx.arc(guard.x, guard.y - 10, 10, 0, Math.PI * 2);
+      this.ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
       this.ctx.fill();
     });
   }
   
-  drawPlayer() {
-    const player = this.gameState.player;
-    
-    this.ctx.fillStyle = player.crouching ? '#27ae60' : '#2ecc71';
-    this.ctx.fillRect(player.x - player.width/2, player.y - player.height/2, player.width, player.height);
-    
-    this.ctx.fillStyle = '#f5d0c5';
-    this.ctx.beginPath();
-    this.ctx.arc(player.x, player.y - player.height/2 + 5, 8, 0, Math.PI * 2);
-    this.ctx.fill();
+  drawExplosions() {
+    this.gameState.explosions.forEach(exp => {
+      const gradient = this.ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, exp.radius);
+      gradient.addColorStop(0, 'rgba(241, 196, 15, 0.9)');
+      gradient.addColorStop(0.5, 'rgba(230, 126, 34, 0.6)');
+      gradient.addColorStop(1, 'rgba(192, 57, 43, 0)');
+      
+      this.ctx.fillStyle = gradient;
+      this.ctx.beginPath();
+      this.ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
   }
   
-  drawDetectionMeter() {
-    const level = this.gameState.detectionLevel;
-    const maxLevel = 10;
-    
-    this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    this.ctx.fillRect(this.canvas.width/2 - 60, 60, 120, 15);
-    
-    const gradient = this.ctx.createLinearGradient(0, 0, 120 * (level/maxLevel), 0);
-    gradient.addColorStop(0, '#2ecc71');
-    gradient.addColorStop(0.5, '#f1c40f');
-    gradient.addColorStop(1, '#e74c3c');
-    
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(this.canvas.width/2 - 58, 62, 116 * (level/maxLevel), 11);
+  drawParticles() {
+    this.gameState.particles.forEach(p => {
+      this.ctx.globalAlpha = p.life;
+      this.ctx.fillStyle = p.color;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+    this.ctx.globalAlpha = 1;
   }
   
   drawUI() {
-    this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
-    this.ctx.fillRect(10, 10, 120, 70);
+    this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    this.ctx.fillRect(10, 10, 200, 100);
     
     this.ctx.fillStyle = '#fff';
-    this.ctx.font = 'bold 14px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`Score: ${this.gameState.score}`, 20, 30);
-    this.ctx.fillText(`Kills: ${this.gameState.stealthKills}`, 20, 50);
-    
-    const objs = this.gameState.objectives.filter(o => o.collected).length;
-    this.ctx.fillText(`Obj: ${objs}/${this.gameState.objectives.length}`, 20, 70);
-    
-    this.ctx.fillStyle = '#ffd93d';
     this.ctx.font = 'bold 16px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('STEALTH MISSION', this.canvas.width / 2, 25);
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`Wave: ${this.gameState.wave}`, 20, 30);
+    this.ctx.fillText(`Score: ${this.gameState.score}`, 20, 50);
+    
+    this.ctx.fillStyle = '#27ae60';
+    this.ctx.fillText(`Siege: ${this.gameState.siegeProgress}%`, 20, 70);
+    
+    this.ctx.fillStyle = '#e74c3c';
+    this.ctx.fillText(`Attackers: ${this.gameState.attackers.length}`, 120, 30);
+    this.ctx.fillStyle = '#3498db';
+    this.ctx.fillText(`Defenders: ${this.gameState.defenders.length}`, 120, 50);
+    
+    this.gameState.players.forEach((player, i) => {
+      const y = this.canvas.height - 60 - i * 40;
+      
+      this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      this.ctx.fillRect(10, y, 160, 35);
+      
+      this.ctx.fillStyle = player.color;
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText(player.name, 20, y + 15);
+      
+      this.ctx.fillStyle = '#2c3e50';
+      this.ctx.fillRect(20, y + 22, 100, 8);
+      this.ctx.fillStyle = '#e74c3c';
+      this.ctx.fillRect(20, y + 22, 100 * (player.health / player.maxHealth), 8);
+    });
   }
   
   drawGameOver() {
     this.ctx.fillStyle = 'rgba(0,0,0,0.85)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
-    if (this.gameState.detected) {
-      this.ctx.fillStyle = '#e74c3c';
-      this.ctx.font = 'bold 50px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText('DETECTED!', this.canvas.width / 2, this.canvas.height / 2 - 20);
-    } else {
-      this.ctx.fillStyle = '#2ecc71';
-      this.ctx.font = 'bold 50px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText('MISSION COMPLETE', this.canvas.width / 2, this.canvas.height / 2 - 20);
-    }
+    this.ctx.fillStyle = '#e74c3c';
+    this.ctx.font = 'bold 60px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
     
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '30px Arial';
-    this.ctx.fillText(`Final Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
+    this.ctx.fillText(`Siege Progress: ${this.gameState.siegeProgress}%`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+    this.ctx.fillText(`Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2 + 60);
+  }
+  
+  drawVictory() {
+    this.ctx.fillStyle = 'rgba(46, 204, 113, 0.3)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.ctx.fillStyle = '#27ae60';
+    this.ctx.font = 'bold 60px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('VICTORY!', this.canvas.width / 2, this.canvas.height / 2 - 40);
+    
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '30px Arial';
+    this.ctx.fillText(`Final Score: ${this.gameState.score}`, this.canvas.width / 2, this.canvas.height / 2 + 30);
   }
   
   updatePlayerInput(name, input) {
@@ -396,4 +740,4 @@ class StealthGame {
   }
 }
 
-window.StealthGame = StealthGame;
+window.CitySiegeGame = CitySiegeGame;

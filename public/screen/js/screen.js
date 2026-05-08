@@ -213,107 +213,99 @@ class ScreenApp {
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {
-    console.log('=== LOADING GAME ===');
-    console.log('Game ID:', gameId);
-    console.log('Game File:', gameFile);
-    console.log('Canvas count:', canvases?.length);
+    console.log('Loading game:', gameId, gameFile);
+    
+    // Get canvas from DOM
+    let canvas = document.getElementById('game-canvas');
+    
+    if (!canvas) {
+      // Create canvas if not exists
+      canvas = document.createElement('canvas');
+      canvas.id = 'game-canvas';
+      document.getElementById('game-screen').appendChild(canvas);
+    }
+    
+    // Ensure canvas is properly sized
+    canvas.style.display = 'block';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Handle window resize
+    window.onresize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (this.gameInstance && this.gameInstance.resizeCanvas) {
+        this.gameInstance.resizeCanvas();
+      }
+    };
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('Failed to get canvas context');
+      return;
+    }
+    
+    // Draw initial screen
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = '30px Arial';
+    ctx.fillText('Loading game...', 50, 50);
     
     try {
-      // Use the canvas from the DOM
-      const canvas = document.getElementById('game-canvas') || canvases?.[0];
-      
-      if (!canvas) {
-        throw new Error('Canvas topilmadi!');
-      }
-      
-      // Ensure canvas has full screen size
-      canvas.style.display = 'block';
-      canvas.style.position = 'absolute';
-      canvas.style.top = '0';
-      canvas.style.left = '0';
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      
-      const gamePath = `/games/genres/${gameFile}`;
+      const gamePath = '/games/genres/' + gameFile;
       console.log('Loading from:', gamePath);
       
       const GameClass = await this.gameLoader.loadGame(gameId, gamePath);
-      console.log('Game class:', GameClass?.name || 'Found');
+      console.log('Game class found:', GameClass?.name);
       
-      // Get context
-      const ctx = canvas.getContext('2d');
-      console.log('Canvas context:', ctx ? 'OK' : 'FAIL');
-      
-      // Set canvas size
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      console.log('Canvas size:', canvas.width, 'x', canvas.height);
-      
-      // Draw test immediately
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#0f0';
-      ctx.fillText('CANVAS ISHLYAPTI!', 50, 50);
-      
-      // Create and start game
+      // Create game instance
       this.gameInstance = new GameClass(canvas, this.players || [], gameId);
-      console.log('Game instance created:', this.gameInstance);
+      console.log('Game instance:', this.gameInstance);
       
+      // Start game
       if (this.gameInstance && typeof this.gameInstance.start === 'function') {
         this.gameInstance.start();
-        console.log('=== GAME STARTED ===');
+        console.log('Game started successfully!');
       } else {
-        console.log('No start method, drawing fallback');
-        this.drawFallback(canvas, ctx);
+        console.log('No start method found');
+        this.drawSimpleGame(canvas, ctx);
       }
       
-      // Show game screen
-      document.getElementById('game-select-screen').classList.remove('active');
+      // Ensure game screen is visible
       document.getElementById('game-screen').classList.add('active');
-      console.log('Screen shown');
+      document.getElementById('game-screen').style.display = 'block';
       
     } catch (err) {
-      console.error('=== GAME ERROR ===', err);
-      
-      // Fallback - draw something anyway
-      const canvas = document.getElementById('game-canvas');
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ff0000';
-        ctx.font = '40px Arial';
-        ctx.fillText('ERROR: ' + err.message, 50, 100);
-        ctx.fillStyle = '#fff';
-        ctx.fillText('Game: ' + gameFile, 50, 160);
-      }
-      
-      document.getElementById('game-select-screen').classList.remove('active');
+      console.error('Game loading error:', err);
+      ctx.fillStyle = '#ff0000';
+      ctx.fillText('ERROR: ' + err.message, 50, 100);
       document.getElementById('game-screen').classList.add('active');
     }
   }
   
-  drawFallback(canvas, ctx) {
+  drawSimpleGame(canvas, ctx) {
     let frame = 0;
-    const draw = () => {
+    const animate = () => {
       frame++;
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      ctx.fillStyle = `hsl(${frame % 360}, 70%, 50%)`;
+      // Draw simple animation
+      ctx.fillStyle = '#4ecdc4';
       ctx.beginPath();
-      ctx.arc(200 + Math.sin(frame * 0.05) * 100, 200, 50, 0, Math.PI * 2);
+      ctx.arc(200 + Math.sin(frame * 0.05) * 150, 200, 60, 0, Math.PI * 2);
       ctx.fill();
       
       ctx.fillStyle = '#fff';
-      ctx.font = '30px Arial';
-      ctx.fillText('Fallback: Game is running!', 50, 400);
+      ctx.font = '24px Arial';
+      ctx.fillText('Simple Game Running!', 50, 400);
       
-      requestAnimationFrame(draw);
+      requestAnimationFrame(animate);
     };
-    draw();
+    animate();
   }
 
   onGameStarted(data) {

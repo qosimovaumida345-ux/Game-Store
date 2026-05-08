@@ -1,78 +1,47 @@
 class GameLoader {
   constructor() {
     this.loadedGames = new Map();
-    this.loadedScripts = new Set();
   }
 
   async loadGame(gameId, gamePath) {
-    // Check if already loaded with different key
-    for (const [key, gameClass] of this.loadedGames.entries()) {
-      if (key.startsWith(gamePath)) {
-        return gameClass;
-      }
-    }
-
-    if (this.loadedScripts.has(gamePath)) {
-      // Script loaded but class not found, try different approach
-      return this.findGameClass(gameId, gamePath);
+    // Check if already loaded
+    if (this.loadedGames.has(gameId)) {
+      return this.loadedGames.get(gameId);
     }
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = gamePath;
-      script.onload = async () => {
-        this.loadedScripts.add(gamePath);
-        
-        // Try to find any Game class in window
-        const gameClass = await this.findGameClass(gameId, gamePath);
-        if (gameClass) {
-          this.loadedGames.set(gameId, gameClass);
-          resolve(gameClass);
-        } else {
-          reject(new Error(`No game class found in ${gamePath}`));
-        }
+      
+      script.onload = () => {
+        // Wait for script to execute
+        setTimeout(() => {
+          // Find any class with 'Game' in name
+          let GameClass = null;
+          
+          for (let key in window) {
+            if (typeof window[key] === 'function' && key.includes('Game')) {
+              GameClass = window[key];
+              console.log('Found game class:', key);
+              break;
+            }
+          }
+          
+          if (GameClass) {
+            this.loadedGames.set(gameId, GameClass);
+            resolve(GameClass);
+          } else {
+            reject(new Error('Game class not found in: ' + gamePath));
+          }
+        }, 100);
       };
-      script.onerror = () => {
-        reject(new Error(`Failed to load game: ${gamePath}`));
+      
+      script.onerror = (e) => {
+        reject(new Error('Failed to load: ' + gamePath));
       };
-      document.body.appendChild(script);
+      
+      document.head.appendChild(script);
     });
-  }
-
-  async findGameClass(gameId, gamePath) {
-    // Try multiple patterns to find the game class
-    const possibleNames = [
-      gameId + 'Game',           // racing-1Game
-      gameId.replace(/-/g, '') + 'Game', // racing1Game
-      'Game'                     // Generic
-    ];
-
-    // Also check all window objects for any class ending with 'Game'
-    for (let key in window) {
-      if (key.toLowerCase().includes('game') && typeof window[key] === 'function') {
-        const GameClass = window[key];
-        // Check if it's a class (has prototype)
-        if (GameClass.prototype && GameClass.prototype.constructor) {
-          // Found a game class!
-          return GameClass;
-        }
-      }
-    }
-
-    // If still not found, fetch the script and parse it
-    try {
-      const response = await fetch(gamePath);
-      const text = await response.text();
-      const match = text.match(/class\s+(\w+Game)\s+/);
-      if (match) {
-        const className = match[1];
-        return window[className];
-      }
-    } catch (e) {
-      console.error('Error parsing game file:', e);
-    }
-
-    return null;
   }
 
   async loadAssets(assets) {

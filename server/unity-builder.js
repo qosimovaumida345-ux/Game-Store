@@ -36,27 +36,40 @@ async function buildUnityGame(gameId, csharpCode) {
     // Initialize required Unity folders to prevent errors
     fs.mkdirSync(path.join(targetProjectDir, 'ProjectSettings'), { recursive: true });
 
-    console.log(`[UnityBuilder] Spawning Unityci/Editor WebGL Docker Container...`);
+    console.log(`[UnityBuilder] Evaluating Execution Context...`);
     
-    // Docker command invoking Unity in Batchmode
-    // Note: We mount the targetProjectDir as /project inside the container.
-    // The image unityci/editor contains the Unity Editor. We pass the user credentials.
+    // Tizim Render ichidagi Dockerfile da ishlayaptimi yoxud shaxsiy kompyuterda ekanligini aniqlaymiz.
+    // Dockerfile muhitida 'docker' degan komanda chiqmaydi, uning o'zini ichida 'Unity' (unity-editor) o'rnatilgan bo'ladi!
+    const isNativeLinuxUnity = process.env.RENDER || fs.existsSync('/opt/unity') || !fs.existsSync('C:\\');
     
-    const dockerCmd = `docker run --rm \
-        -v "${targetProjectDir.replace(/\\/g, '/')}:/project" \
-        unityci/editor:ubuntu-2022.3.16f1-webgl-3 \
-        Unity -quit -batchmode -nographics \
+    let engineCmd;
+    
+    if (isNativeLinuxUnity) {
+        // RENDER / YANGO DOCKERFILE MUHITI! (To'g'ridan-to'g'ri Unity'ga yuzlanamiz)
+        engineCmd = `unity-editor -quit -batchmode -nographics \
         -username "${UNITY_EMAIL}" \
         -password "${UNITY_PASSWORD}" \
-        -projectPath /project \
+        -projectPath "${targetProjectDir}" \
         -executeMethod WebGLBuilder.Build \
         -buildTarget WebGL`;
+    } else {
+        // WINDOWS KOMPYUTERI DOCKER DESKTOP ORQALI ISHLASHA:
+        engineCmd = `docker run --rm \
+            -v "${targetProjectDir.replace(/\\/g, '/')}:/project" \
+            unityci/editor:ubuntu-2022.3.16f1-webgl-3 \
+            Unity -quit -batchmode -nographics \
+            -username "${UNITY_EMAIL}" \
+            -password "${UNITY_PASSWORD}" \
+            -projectPath /project \
+            -executeMethod WebGLBuilder.Build \
+            -buildTarget WebGL`;
+    }
 
     try {
-        console.log(`[UnityBuilder] Running (This may take a few minutes)...`);
+        console.log(`[UnityBuilder] Executing Engine CLI (This may take a few minutes)...`);
         
         // Execute the build command (Timeout 10 minutes)
-        const { stdout, stderr } = await execPromise(dockerCmd, { timeout: 600000 });
+        const { stdout, stderr } = await execPromise(engineCmd, { timeout: 600000 });
         
         console.log(`[UnityBuilder] Build Finished successfully!`);
         

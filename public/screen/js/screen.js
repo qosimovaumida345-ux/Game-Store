@@ -53,12 +53,12 @@ class ScreenApp {
   }
 
   handleMessage(data) {
+    console.log('Message:', data.type);
     switch (data.type) {
       case 'room-created': this.onRoomCreated(data); break;
       case 'player-joined': this.onPlayerJoined(data); break;
       case 'player-left': this.onPlayerLeft(data); break;
-      case 'game-starting': this.onGameStarting(data); break;
-      case 'game-started': this.onGameStarted(data); break;
+      case 'game-started': this.onGameStarting(data); break;  // Fixed!
       case 'player-input': this.onPlayerInput(data); break;
       case 'game-list': this.onGameList(data); break;
     }
@@ -200,8 +200,9 @@ class ScreenApp {
   }
 
   onGameStarting(data) {
-    console.log('=== GAME STARTING ===', data.gameId);
-    this.currentGame = data.gameId;
+    console.log('=== GAME STARTING ===', data);
+    const gameId = data.gameId || data;
+    this.currentGame = gameId;
     
     // Hide game select, show game screen
     const gameSelectScreen = document.getElementById('game-select-screen');
@@ -223,14 +224,14 @@ class ScreenApp {
       gameScreen.style.background = '#000';
     }
     
-    console.log('Game screen shown');
+    console.log('Game screen shown, loading:', gameId);
     
     this.layoutEngine = new LayoutEngine(document.getElementById('game-screen'));
     this.gameLoader = new GameLoader();
     
-    const canvases = this.layoutEngine.applyLayout(this.players.length, data.gameId);
+    const canvases = this.layoutEngine.applyLayout(this.players.length, gameId);
     
-    this.loadAndStartGame(data.gameId, data.gameId, canvases);
+    this.loadAndStartGame(gameId, gameId, canvases);
   }
 
   async loadAndStartGame(gameId, gameFile, canvases) {

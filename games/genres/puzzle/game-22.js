@@ -1,0 +1,19 @@
+// Sudoku Puzzle Game
+class SudokuGame {
+  constructor(canvas, players, gameId) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.players = players; this.gameId = gameId;
+    this.isRunning = false; this.lastTime = 0; this.resizeCanvas();
+    this.gameState = { time: 0, puzzle: [], solution: [], selected: null, notes: [], mistakes: 0, maxMistakes: 3, completed: false, status: 'playing', gameOver: false };
+    this.initGame();
+  }
+  resizeCanvas() { this.canvas.width = this.parentElement.clientWidth || 800; this.canvas.height = this.parentElement.clientHeight || 600; }
+  initGame() { const puzzle = '530070000600195000098000060800060003400803001700020006060000280000419005000080079'; this.gameState.puzzle = []; this.gameState.solution = []; for (let i = 0; i < 81; i++) { const n = parseInt(puzzle[i]); this.gameState.puzzle[i] = n === 0 ? null : n; } const sol = '534678912672195348198342567859761423426853791713924856961537284287419635345286179'; for (let i = 0; i < 81; i++) this.gameState.solution[i] = parseInt(sol[i]); this.gameState.notes = Array(81).fill(null).map(() => []); }
+  start() { this.isRunning = true; this.lastTime = performance.now(); this.gameLoop(this.lastTime); }
+  stop() { this.isRunning = false; }
+  gameLoop(ct) { if (!this.isRunning) return; const dt = (ct - this.lastTime) / 1000; this.lastTime = ct; this.update(dt); this.render(); requestAnimationFrame(t => this.gameLoop(t)); }
+  update(dt) { this.gameState.time += dt; if (this.gameState.completed) return; let allFilled = true; for (let i = 0; i < 81; i++) if (this.gameState.puzzle[i] === null) allFilled = false; if (allFilled) { this.gameState.completed = true; } }
+  getPlayerInput(n) { return window.gameState && window.gameState[n] ? window.gameState[n].input || {} : {}; }
+  render() { this.ctx.fillStyle = '#f5f5f5'; this.ctx.fillRect(0, 0, 800, 600); const cs = 55, ox = 175, oy = 75; for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) { const cell = this.gameState.puzzle[r * 9 + c]; const original = this.gameState.puzzle[r * 9 + c] !== null; this.ctx.fillStyle = (r + c) % 2 === 0 ? '#fff' : '#ecf0f1'; this.ctx.fillRect(ox + c * cs, oy + r * cs, cs, cs); this.ctx.strokeStyle = '#bdc3c7'; this.ctx.lineWidth = 1; this.ctx.strokeRect(ox + c * cs, oy + r * cs, cs, cs); if (cell !== null) { this.ctx.fillStyle = original ? '#2c3e50' : '#3498db'; this.ctx.font = 'bold 28px Arial'; this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillText(cell, ox + c * cs + cs/2, oy + r * cs + cs/2); } } this.ctx.strokeStyle = '#2c3e50'; this.ctx.lineWidth = 3; for (let i = 0; i <= 9; i++) { this.ctx.beginPath(); this.ctx.moveTo(ox + i * cs, oy); this.ctx.lineTo(ox + i * cs, oy + 9 * cs); this.ctx.moveTo(ox, oy + i * cs); this.ctx.lineTo(ox + 9 * cs, oy + i * cs); this.ctx.stroke(); } this.ctx.fillStyle = '#e74c3c'; this.ctx.font = '16px Arial'; this.ctx.textAlign = 'left'; this.ctx.fillText('Mistakes: ' + this.gameState.mistakes + '/3', 20, 30); this.ctx.fillStyle = '#2ecc71'; this.ctx.fillText('SUDOKU', 400, 25); if (this.gameState.completed) { this.ctx.fillStyle = 'rgba(0,0,0,0.7)'; this.ctx.fillRect(0, 0, 800, 600); this.ctx.fillStyle = '#2ecc71'; this.ctx.font = '48px Arial'; this.ctx.fillText('COMPLETE!', 400, 300); } }
+  updatePlayerInput(n, i) { window.gameState = window.gameState || {}; window.gameState[n] = { input: i }; if (i.number && this.gameState.selected !== null) { const idx = this.gameState.selected; if (this.gameState.puzzle[idx] === null) { if (i.number === this.gameState.solution[idx]) { this.gameState.puzzle[idx] = i.number; this.gameState.notes[idx] = []; } else { this.gameState.mistakes++; if (this.gameState.mistakes >= this.gameState.maxMistakes) this.gameState.gameOver = true; } } } if (i.select !== undefined) this.gameState.selected = i.select; }
+}
+window.SudokuGame = SudokuGame;

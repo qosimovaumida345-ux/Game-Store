@@ -1,0 +1,14 @@
+{
+  "name": "gaming-platform-500",
+  "version": "1.0.0",
+  "description": "500+ multiplayer games platform - AirConsole clone",
+  "scripts": {
+    "start": "cd server && node index.js",
+    "dev": "cd server && node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "uuid": "^9.0.0"
+  }
+}

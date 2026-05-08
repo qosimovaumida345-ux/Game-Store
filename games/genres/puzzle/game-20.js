@@ -1,0 +1,20 @@
+// Tower of Hanoi Game
+class TowerOfHanoiGame {
+  constructor(canvas, players, gameId) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.players = players; this.gameId = gameId;
+    this.isRunning = false; this.lastTime = 0; this.resizeCanvas();
+    this.gameState = { time: 0, moves: 0, score: 0, towers: [[], [], []], selected: null, disks: 6, status: 'playing', gameOver: false, minMoves: 63 };
+    this.initGame();
+  }
+  resizeCanvas() { this.canvas.width = this.parentElement.clientWidth || 800; this.canvas.height = this.parentElement.clientHeight || 600; }
+  initGame() { const colors = ['#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#e67e22']; for (let i = this.gameState.disks; i > 0; i--) this.gameState.towers[0].push({ size: i, color: colors[i - 1] }); }
+  start() { this.isRunning = true; this.lastTime = performance.now(); this.gameLoop(this.lastTime); }
+  stop() { this.isRunning = false; }
+  gameLoop(ct) { if (!this.isRunning) return; const dt = (ct - this.lastTime) / 1000; this.lastTime = ct; this.update(dt); this.render(); requestAnimationFrame(t => this.gameLoop(t)); }
+  update(dt) { this.gameState.time += dt; if (this.gameState.towers[2].length === this.gameState.disks) { this.gameState.gameOver = true; this.gameState.score = Math.max(0, 1000 - this.gameState.moves * 10); } }
+  getPlayerInput(n) { return window.gameState && window.gameState[n] ? window.gameState[n].input || {} : {}; }
+  selectTower(t) { if (this.gameState.selected === null) { if (this.gameState.towers[t].length > 0) this.gameState.selected = t; } else { if (this.gameState.selected !== t) { const src = this.gameState.towers[this.gameState.selected], dst = this.gameState.towers[t]; if (dst.length === 0 || src[src.length - 1].size < dst[dst.length - 1].size) { dst.push(src.pop()); this.gameState.moves++; } } this.gameState.selected = null; } }
+  render() { this.ctx.fillStyle = '#1a1a2e'; this.ctx.fillRect(0, 0, 800, 600); const tw = [150, 400, 650], baseY = 500, towerH = 250; this.ctx.strokeStyle = '#7f8c8d'; this.ctx.lineWidth = 8; for (let i = 0; i < 3; i++) { this.ctx.beginPath(); this.ctx.moveTo(tw[i], baseY - towerH); this.ctx.lineTo(tw[i], baseY); this.ctx.stroke(); } this.ctx.fillStyle = '#7f8c8d'; this.ctx.fillRect(50, baseY, 700, 20); for (let t = 0; t < 3; t++) { this.gameState.towers[t].forEach((d, i) => { const w = 30 + d.size * 15, h = 25; this.ctx.fillStyle = d.color; this.ctx.fillRect(tw[t] - w/2, baseY - (i + 1) * h, w, h); this.ctx.strokeStyle = '#fff'; this.ctx.strokeRect(tw[t] - w/2, baseY - (i + 1) * h, w, h); }); } if (this.gameState.selected !== null) { this.ctx.strokeStyle = '#f1c40f'; this.ctx.lineWidth = 4; this.ctx.beginPath(); this.ctx.arc(tw[this.gameState.selected], baseY - towerH - 20, 15, 0, Math.PI*2); this.ctx.stroke(); } this.ctx.fillStyle = '#fff'; this.ctx.font = '20px Arial'; this.ctx.textAlign = 'left'; this.ctx.fillText('Moves: ' + this.gameState.moves, 20, 40); this.ctx.fillText('Best: ' + this.gameState.minMoves, 20, 70); this.ctx.fillStyle = '#f1c40f'; this.ctx.textAlign = 'center'; this.ctx.fillText('TOWER OF HANOI', 400, 25); this.ctx.fillStyle = '#95a5a6'; this.ctx.font = '14px Arial'; this.ctx.fillText('Click towers to move disks', 400, 570); if (this.gameState.gameOver) { this.ctx.fillStyle = 'rgba(0,0,0,0.7)'; this.ctx.fillRect(0, 0, 800, 600); this.ctx.fillStyle = '#2ecc71'; this.ctx.font = '48px Arial'; this.ctx.fillText('COMPLETE!', 400, 280); this.ctx.font = '24px Arial'; this.ctx.fillText('Moves: ' + this.gameState.moves + ' | Score: ' + this.gameState.score, 400, 330); } }
+  updatePlayerInput(n, i) { window.gameState = window.gameState || {}; window.gameState[n] = { input: i }; if (i.select === 0) this.selectTower(0); if (i.select === 1) this.selectTower(1); if (i.select === 2) this.selectTower(2); }
+}
+window.TowerOfHanoiGame = TowerOfHanoiGame;

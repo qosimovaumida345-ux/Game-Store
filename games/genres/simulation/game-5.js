@@ -1,0 +1,19 @@
+// Airport Tycoon Game
+class AirportTycoonGame {
+  constructor(canvas, players, gameId) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.players = players; this.gameId = gameId;
+    this.isRunning = false; this.lastTime = 0; this.resizeCanvas();
+    this.gameState = { time: 0, money: 10000, passengers: 0, satisfaction: 50, planes: [], terminals: [], securityQueue: 0, boardingQueue: 0, gates: [false, false, false], ticketPrice: 100, fuel: 100, status: 'operating', gameOver: false };
+    this.initGame();
+  }
+  resizeCanvas() { this.canvas.width = this.parentElement.clientWidth || 800; this.canvas.height = this.parentElement.clientHeight || 600; }
+  initGame() { this.gameState.terminals = [{ x: 150, y: 100, width: 120, height: 80, type: 'checkin', queue: 0 }, { x: 350, y: 100, width: 100, height: 80, type: 'security', queue: 0 }, { x: 550, y: 100, width: 120, height: 80, type: 'gate', assigned: null }]; }
+  start() { this.isRunning = true; this.lastTime = performance.now(); this.gameLoop(this.lastTime); }
+  stop() { this.isRunning = false; }
+  gameLoop(ct) { if (!this.isRunning) return; const dt = (ct - this.lastTime) / 1000; this.lastTime = ct; this.update(dt); this.render(); requestAnimationFrame(t => this.gameLoop(t)); }
+  update(dt) { this.gameState.time += dt; if (this.gameState.time > 1) { this.gameState.time = 0; this.gameState.passengers += Math.floor(Math.random() * 5); this.gameState.money -= 100; this.gameState.terminals.forEach(t => { if (t.type === 'checkin' && t.queue > 0) { t.queue--; this.gameState.securityQueue++; } if (t.type === 'security' && t.queue > 0) { t.queue--; this.gameState.boardingQueue++; } }); if (Math.random() < 0.2 && this.gameState.boardingQueue > 0 && this.gameState.gates.some(g => !g)) { this.gameState.planes.push({ x: 750, y: 200, gate: 0, passengers: 20, fuel: 100 }); this.gameState.boardingQueue -= 20; } } this.gameState.planes.forEach((p, i) => { p.x -= 100 * dt; p.fuel -= dt * 5; if (p.x < 100) { this.gameState.money += p.passengers * this.gameState.ticketPrice; this.gameState.planes.splice(i, 1); } }); }
+  getPlayerInput(n) { return window.gameState && window.gameState[n] ? window.gameState[n].input || {} : {}; }
+  render() { this.ctx.fillStyle = '#2c3e50'; this.ctx.fillRect(0, 0, 800, 600); this.ctx.fillStyle = '#7f8c8d'; this.ctx.fillRect(100, 400, 600, 80); this.ctx.fillStyle = '#95a5a6'; this.ctx.fillRect(100, 380, 600, 20); this.ctx.fillStyle = '#34495e'; this.gameState.terminals.forEach(t => { this.ctx.fillStyle = t.type === 'checkin' ? '#3498db' : t.type === 'security' ? '#e74c3c' : '#2ecc71'; this.ctx.fillRect(t.x, t.y, t.width, t.height); this.ctx.fillStyle = '#fff'; this.ctx.font = '12px Arial'; this.ctx.fillText(t.type.toUpperCase(), t.x + t.width/2, t.y + t.height/2); }); this.gameState.planes.forEach(p => { this.ctx.fillStyle = '#fff'; this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); this.ctx.lineTo(p.x - 30, p.y + 10); this.ctx.lineTo(p.x - 30, p.y - 10); this.ctx.fill(); this.ctx.fillStyle = '#f1c40f'; this.ctx.fillRect(p.x - 5, p.y - 3, 10, 6); }); this.ctx.fillStyle = '#f1c40f'; this.ctx.font = '20px Arial'; this.ctx.textAlign = 'left'; this.ctx.fillText('Money: $' + Math.floor(this.gameState.money), 20, 30); this.ctx.fillText('Passengers: ' + this.gameState.passengers, 20, 60); this.ctx.fillText('Satisfaction: ' + Math.floor(this.gameState.satisfaction) + '%', 20, 90); this.ctx.fillStyle = '#e74c3c'; this.ctx.fillText('AIRPORT TYCOON', 400, 25); }
+  updatePlayerInput(n, i) { window.gameState = window.gameState || {}; window.gameState[n] = { input: i }; }
+}
+window.AirportTycoonGame = AirportTycoonGame;

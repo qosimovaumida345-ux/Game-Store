@@ -1,0 +1,252 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: white;
+  overflow: hidden;
+  height: 100vh;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.screen {
+  display: none;
+  width: 100%;
+  height: 100vh;
+  padding: 20px;
+  text-align: center;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.screen.active {
+  display: flex;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 30px;
+  text-shadow: 0 0 20px rgba(255,107,107,0.5);
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+
+p {
+  margin-bottom: 30px;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+input {
+  padding: 18px;
+  font-size: 2rem;
+  border: none;
+  border-radius: 15px;
+  text-align: center;
+  width: 280px;
+  letter-spacing: 15px;
+  margin-bottom: 30px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+  outline: none;
+}
+
+input::placeholder {
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 5px;
+}
+
+input:focus {
+  background: rgba(255,255,255,0.2);
+  box-shadow: 0 0 20px rgba(255,107,107,0.3);
+}
+
+.btn {
+  padding: 18px 50px;
+  font-size: 1.3rem;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 5px 20px rgba(102,126,234,0.4);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102,126,234,0.5);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  box-shadow: 0 5px 20px rgba(255,107,107,0.4);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 8px 25px rgba(255,107,107,0.5);
+}
+
+#controller-buttons {
+  display: grid;
+  gap: 15px;
+  width: 100%;
+  max-width: 450px;
+  margin-top: 20px;
+}
+
+.btn-controller {
+  padding: 25px;
+  font-size: 1.4rem;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 15px;
+  color: white;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: all 0.1s;
+}
+
+.btn-controller:active, .btn-controller.active {
+  background: rgba(255,107,107,0.4);
+  border-color: #ff6b6b;
+  transform: scale(0.95);
+}
+
+.dpad-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 70px);
+  grid-template-rows: repeat(3, 70px);
+  gap: 5px;
+}
+
+.dpad .btn-controller {
+  padding: 0;
+  width: 70px;
+  height: 70px;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dpad .up { grid-column: 2; grid-row: 1; }
+.dpad .left { grid-column: 1; grid-row: 2; }
+.dpad .center { grid-column: 2; grid-row: 2; background: transparent; border: none; }
+.dpad .right { grid-column: 3; grid-row: 2; }
+.dpad .down { grid-column: 2; grid-row: 3; }
+
+.action-buttons {
+  display: flex;
+  gap: 20px;
+  margin-top: 15px;
+  justify-content: center;
+}
+
+.action-buttons .btn-controller {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.action-buttons .btn-a { background: rgba(255,107,107,0.3); border-color: #ff6b6b; }
+.action-buttons .btn-b { background: rgba(78,205,196,0.3); border-color: #4ecdc4; }
+.action-buttons .btn-x { background: rgba(255,217,61,0.3); border-color: #ffd93d; }
+.action-buttons .btn-y { background: rgba(162,155,254,0.3); border-color: #a29bfe; }
+
+.joystick-container {
+  width: 200px;
+  height: 200px;
+  position: relative;
+  margin: 20px auto;
+}
+
+.joystick-area {
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.3);
+  position: relative;
+}
+
+.joystick-knob {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 5px 20px rgba(255,107,107,0.4);
+  touch-action: none;
+}
+
+#game-info {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 450px;
+  margin-bottom: 20px;
+  padding: 15px 25px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 15px;
+  font-size: 1.1rem;
+}
+
+#player-display-name {
+  font-weight: bold;
+  color: #ffd93d;
+}
+
+#game-score {
+  color: #4ecdc4;
+}
+
+#players-waiting {
+  background: rgba(255,255,255,0.1);
+  padding: 20px;
+  border-radius: 15px;
+  min-width: 250px;
+}
+
+#waiting-players-list {
+  list-style: none;
+}
+
+#waiting-players-list li {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 1.1rem;
+}
+
+.hidden {
+  display: none !important;
+}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Gaming Platform - Controller</title>
+  <link rel="stylesheet" href="css/controller.css">
+</head>
+<body>
+  <div id="app">
+    <div id="code-entry-screen" class="screen active">
+      <h1>Gaming Platform</h1>
+      <p>Xona kodini kiriting:</p>
+      <div id="code-input">
+        <input type="text" id="room-code-input" maxlength="6" placeholder="000000" pattern="[0-9]*" inputmode="numeric">
+        <button id="btn-join-code" class="btn btn-primary">Qo'shilish</button>
+      </div>
+    </div>
+
+    <div id="name-entry-screen" class="screen">
+      <h2>Ismingizni Kiriting</h2>
+      <input type="text" id="player-name-input" placeholder="Ismingiz..." maxlength="20">
+      <button id="btn-submit-name" class="btn btn-primary">Kirish</button>
+    </div>
+
+    <div id="waiting-screen" class="screen">
+      <h2>Xona: <span id="display-room-code"></span></h2>
+      <p>Kuting...</p>
+      <div id="players-waiting">
+        <h3>Qo'shilgan o'yinchilar:</h3>
+        <ul id="waiting-players-list"></ul>
+      </div>
+    </div>
+
+    <div id="controller-screen" class="screen">
+      <div id="game-info">
+        <span id="player-display-name"></span>
+        <span id="game-score">Ball: 0</span>
+      </div>
+      <div id="controller-buttons"></div>
+    </div>
+  </div>
+
+  <script src="js/inputTypes/racing.js"></script>
+  <script src="js/inputTypes/platformer.js"></script>
+  <script src="js/inputTypes/fighting.js"></script>
+  <script src="js/inputTypes/puzzle.js"></script>
+  <script src="js/inputTypes/shooter.js"></script>
+  <script src="js/inputTypes/sports.js"></script>
+  <script src="js/inputTypes/arcade.js"></script>
+  <script src="js/inputTypes/default.js"></script>
+  <script src="js/controller.js"></script>
+</body>
+</html>

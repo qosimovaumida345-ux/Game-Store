@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gaming Platform 500+</title>
+  <link rel="stylesheet" href="css/screen.css">
+  <link rel="stylesheet" href="css/layouts.css">
+</head>
+<body>
+  <div id="app">
+    <div id="room-create-screen" class="screen active">
+      <h1>Gaming Platform 500+</h1>
+      <button id="btn-create-room" class="btn btn-primary">O'yin Boshlash</button>
+      <div id="room-info" class="hidden">
+        <h2>Xona Kodi: <span id="room-code"></span></h2>
+        <div id="qr-code"></div>
+        <p>Telefoningizdan saytga kiring va kodni kiriting</p>
+      </div>
+    </div>
+
+    <div id="game-select-screen" class="screen">
+      <h1>O'yin Tanlang</h1>
+      <div id="players-list">
+        <h3>Qo'shilgan O'yinchilar:</h3>
+        <ul id="players-ul"></ul>
+      </div>
+      <div id="games-categories"></div>
+      <div id="games-grid"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+      <canvas id="game-canvas"></canvas>
+    </div>
+  </div>
+
+  <script src="js/layoutEngine.js"></script>
+  <script src="js/gameLoader.js"></script>
+  <script src="js/screen.js"></script>
+</body>
+</html>

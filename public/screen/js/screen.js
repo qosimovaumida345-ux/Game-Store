@@ -115,9 +115,18 @@ class ScreenApp {
   }
 
   showGameSelect() {
+    console.log('Showing game select, games:', this.gameList.length);
     document.getElementById('room-create-screen').classList.remove('active');
     document.getElementById('game-select-screen').classList.add('active');
     this.updatePlayersList();
+    
+    // Ensure games are rendered
+    if (this.gameList.length > 0) {
+      this.renderCategories();
+      this.renderGames('all');
+    } else {
+      document.getElementById('games-grid').innerHTML = '<p style="color: #888;">O\'yinlar yuklanmoqda...</p>';
+    }
   }
 
   onGameList(data) {

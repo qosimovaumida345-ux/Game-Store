@@ -8,6 +8,7 @@ class ScreenApp {
     this.gameLoader = null;
     this.gameInstance = null;
     this.gameList = [];
+    this.roomCreated = false;
     this.init();
   }
 
@@ -57,6 +58,7 @@ class ScreenApp {
 
   onRoomCreated(data) {
     this.roomCode = data.roomCode;
+    this.roomCreated = true;
     document.getElementById('room-code').textContent = data.roomCode;
     document.getElementById('room-info').classList.remove('hidden');
     document.getElementById('btn-create-room').style.display = 'none';
@@ -85,7 +87,11 @@ class ScreenApp {
 
   updatePlayersList() {
     const ul = document.getElementById('players-ul');
-    ul.innerHTML = this.players.map(p => `<li>Player: ${p}</li>`).join('');
+    if (this.players.length === 0) {
+      ul.innerHTML = '<li style="color: #888;">Hali o\'yinchilar yo\'q</li>';
+    } else {
+      ul.innerHTML = this.players.map(p => `<li><span class="player-dot"></span>${p}</li>`).join('');
+    }
   }
 
   showGameSelect() {
@@ -97,6 +103,11 @@ class ScreenApp {
     this.gameList = data.games;
     this.renderCategories();
     this.renderGames('all');
+    
+    if (this.roomCreated && this.players.length > 0) {
+      document.getElementById('waiting-message').classList.add('hidden');
+      this.showGameSelect();
+    }
   }
 
   renderCategories() {

@@ -203,6 +203,51 @@ h2 {
   margin-top: 15px;
 }
 
+.players-on-screen {
+  margin-top: 20px;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-radius: 10px;
+  padding: 15px;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.players-on-screen h3 {
+  color: #4ecdc4;
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.players-on-screen ul {
+  list-style: none;
+  padding: 0;
+}
+
+.players-on-screen li {
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  margin: 5px 0;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.players-on-screen .player-dot {
+  width: 12px;
+  height: 12px;
+  background: #4ecdc4;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .spinner {
   width: 50px;
   height: 50px;

@@ -22,16 +22,24 @@ class ScreenApp {
     this.ws = new WebSocket(`${protocol}//${window.location.host}`);
 
     this.ws.onopen = () => {
-      console.log('Connected to server');
+      console.log('Screen connected to server');
       this.ws.send(JSON.stringify({ type: 'get-games' }));
     };
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('Screen received:', data.type, data);
       this.handleMessage(data);
     };
 
-    this.ws.onclose = () => setTimeout(() => this.connectWebSocket(), 3000);
+    this.ws.onclose = () => {
+      console.log('Screen WebSocket closed, reconnecting...');
+      setTimeout(() => this.connectWebSocket(), 3000);
+    };
+    
+    this.ws.onerror = (err) => {
+      console.error('Screen WebSocket error:', err);
+    };
   }
 
   bindEvents() {
@@ -71,12 +79,24 @@ class ScreenApp {
   }
 
   onPlayerJoined(data) {
+    console.log('Player joined!', data.players);
     this.players = data.players;
     this.updatePlayersList();
     
+    // Update waiting screen players list
+    const waitingUl = document.getElementById('waiting-players-ul');
+    if (waitingUl) {
+      waitingUl.innerHTML = this.players.map(p => `<li><span class="player-dot"></span>${p}</li>`).join('');
+    }
+    
+    // Force UI update
+    const waitingMsg = document.getElementById('waiting-message');
+    if (waitingMsg) {
+      waitingMsg.innerHTML = `<p style="color: #4ecdc4;">✅ ${this.players.length} o'yinchi qo'shildi! O'yin tanlang</p>`;
+    }
+    
     if (this.players.length > 0 && this.gameList.length > 0) {
-      document.getElementById('waiting-message').classList.add('hidden');
-      this.showGameSelect();
+      setTimeout(() => this.showGameSelect(), 500);
     }
   }
 
@@ -97,6 +117,7 @@ class ScreenApp {
   showGameSelect() {
     document.getElementById('room-create-screen').classList.remove('active');
     document.getElementById('game-select-screen').classList.add('active');
+    this.updatePlayersList();
   }
 
   onGameList(data) {

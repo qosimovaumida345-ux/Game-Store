@@ -119,11 +119,16 @@ function handleJoinRoom(connId, data) {
 
   // Notify screen
   const screenConn = connections.get(room.screenId);
+  console.log('Notifying screen:', room.screenId, 'players:', Array.from(room.players.values()).map(p => p.name));
   if (screenConn && screenConn.ws.readyState === WebSocket.OPEN) {
-    screenConn.ws.send(JSON.stringify({
+    const msg = JSON.stringify({
       type: 'player-joined',
       players: Array.from(room.players.values()).map(p => p.name)
-    }));
+    });
+    console.log('Sending to screen:', msg);
+    screenConn.ws.send(msg);
+  } else {
+    console.log('Screen connection not found or not open');
   }
 
   conn.ws.send(JSON.stringify({

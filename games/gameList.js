@@ -126,5 +126,9 @@ genres.forEach(genre => {
   }
 });
 
-window.gameList = gameList;
+// Export for both browser and server
+if (typeof window !== 'undefined') {
+  window.gameList = gameList;
+}
+
 console.log(`Total games: ${gameList.length}`);

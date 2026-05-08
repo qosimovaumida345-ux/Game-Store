@@ -61,15 +61,21 @@ class ScreenApp {
     document.getElementById('room-info').classList.remove('hidden');
     document.getElementById('btn-create-room').style.display = 'none';
     
+    const qrUrl = data.qrUrl || `${window.location.origin}/controller/?code=${data.roomCode}`;
     document.getElementById('qr-code').innerHTML = 
-      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qrUrl)}" alt="QR Code">`;
+      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}" alt="QR Code">`;
     
-    setTimeout(() => this.showGameSelect(), 1000);
+    document.getElementById('waiting-message').classList.remove('hidden');
   }
 
   onPlayerJoined(data) {
     this.players = data.players;
     this.updatePlayersList();
+    
+    if (this.players.length > 0 && this.gameList.length > 0) {
+      document.getElementById('waiting-message').classList.add('hidden');
+      this.showGameSelect();
+    }
   }
 
   onPlayerLeft(data) {
@@ -114,7 +120,7 @@ class ScreenApp {
     const grid = document.getElementById('games-grid');
     grid.innerHTML = games.map(game => `
       <div class="game-card" data-game-id="${game.id}" data-game-file="${game.file}">
-        <h3>${game.icon} ${game.name}</h3>
+        <h3>${game.name}</h3>
         <p>${game.desc}</p>
         <small>O'yinchilar: ${game.players.min}-${game.players.max}</small>
       </div>

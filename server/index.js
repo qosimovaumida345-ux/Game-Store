@@ -208,7 +208,10 @@ function handleGameInput(connId, data) {
 }
 
 function handleGetGames(connId) {
-  const games = require('../games/gameList.js');
+  const gameListModule = require('../games/gameList.js');
+  // Handle both array and object export
+  const games = Array.isArray(gameListModule) ? gameListModule : (gameListModule.gameList || []);
+  console.log('Sending games:', games.length);
   connections.get(connId).ws.send(JSON.stringify({ type: 'game-list', games }));
 }
 

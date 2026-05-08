@@ -131,4 +131,9 @@ if (typeof window !== 'undefined') {
   window.gameList = gameList;
 }
 
+// Export for Node.js
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = gameList;
+}
+
 console.log(`Total games: ${gameList.length}`);

@@ -98,6 +98,38 @@
             position: relative;
             overflow: hidden;
         }
+
+        /* Game iframe container */
+        #external-game-frame {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 5000;
+            border: none;
+            background: #000;
+        }
+        
+        /* Back button overlay for iframe games */
+        #iframe-back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 5500;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-family: 'Barlow', sans-serif;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        #iframe-back-btn:hover {
+            background: rgba(255,255,255,0.15);
+        }
     </style>
 
     <!-- React & Framer Motion -->
@@ -136,7 +168,6 @@
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            // insert before UI
             container.insertBefore(renderer.domElement, document.getElementById('game-ui'));
 
             const geometry = new THREE.BufferGeometry();
@@ -144,7 +175,6 @@
             const colors = [];
             const sizes = [];
 
-            // Enhance starfield for Unity VM loading illusion
             for ( let i = 0; i < 30000; i ++ ) {
                 const x = (Math.random() - 0.5) * 3000;
                 const y = (Math.random() - 0.5) * 3000;
@@ -178,14 +208,10 @@
 
             function animate() {
                 requestAnimationFrame( animate );
-                
                 points.rotation.y += 0.0008;
                 points.rotation.x += 0.0003;
-                
-                // Acceleration effect
                 camera.position.z -= 4;
                 if(camera.position.z < -1500) camera.position.z = 1500;
-
                 renderer.render( scene, camera );
             }
             animate();
@@ -311,18 +337,20 @@
                     new window.QRious({
                         element: canvasRef.current,
                         value: value,
-                        size: 200,
-                        background: 'transparent',
-                        foreground: 'white'
+                        size: 250,
+                        background: '#ffffff',
+                        foreground: '#000000',
+                        level: 'M',
+                        padding: 15
                     });
                 }
             }, [value]);
-            return <canvas ref={canvasRef} className="opacity-90"></canvas>;
+            return <canvas ref={canvasRef} style={{borderRadius: '16px'}}></canvas>;
         }
 
         function Lobby({ roomId, players, onStartGame, availableGames, hide }) {
             if (hide) return null;
-            const joinUrl = `http://${window.location.host}/controller/`;
+            const joinUrl = `${window.location.protocol}//${window.location.host}/controller/`;
             
             return (
                 <section className="relative min-h-screen z-10 w-full overflow-hidden flex flex-col pb-16">
@@ -365,11 +393,11 @@
                                     <motion.div 
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
-                                        key={i} 
+                                        key={p.name || i} 
                                         className="liquid-glass rounded-xl p-4 flex items-center gap-4"
                                     >
                                         <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: p.color || '#fff'}}>
-                                            <span className="text-black font-body font-bold text-lg">{p.name.charAt(0).toUpperCase()}</span>
+                                            <span className="text-black font-body font-bold text-lg">{(p.name || '?').charAt(0).toUpperCase()}</span>
                                         </div>
                                         <span className="text-white font-body text-lg font-medium">{p.name}</span>
                                     </motion.div>
@@ -397,7 +425,7 @@
                                         {availableGames.map((game, i) => (
                                             <div 
                                                 key={i}
-                                                onClick={() => onStartGame(game.path)}
+                                                onClick={() => onStartGame(game)}
                                                 className="liquid-glass rounded-xl p-6 cursor-pointer hover:bg-white/10 transition-colors group relative overflow-hidden"
                                             >
                                                 {/* Futuristic glow effect */}
@@ -422,45 +450,84 @@
             const [players, setPlayers] = useState([]);
             const [gameState, setGameState] = useState('lobby'); // lobby, playing
             const [gameUrl, setGameUrl] = useState(null);
+            const [currentGameName, setCurrentGameName] = useState('');
             const [availableGames, setAvailableGames] = useState([]);
             const socketRef = useRef(null);
+            const gamesPollerRef = useRef(null);
 
             useEffect(() => {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${wsProtocol}//${window.location.host}/screen`;
-                const ws = new WebSocket(wsUrl);
+                const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
                 
                 ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    // console.log('WS Data:', data); // Silenced console spam
-                    
-                    if (data.type === 'room-created') {
-                        setRoomId(data.roomCode); // FIXED: The server sends roomCode, not roomId
-                        window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-                    }
-                    else if (data.type === 'player-joined') {
-                        setPlayers(prev => [...prev, { name: data.playerName, color: data.color || '#3498db' }]);
-                    }
-                    else if (data.type === 'player-left') {
-                        setPlayers(prev => prev.filter(p => p.name !== data.playerName));
-                    }
-                    else if (data.type === 'game-list') {
-                        setAvailableGames(data.games || []);
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('[VTX Screen] MSG:', data.type, data);
+                        
+                        switch(data.type) {
+                            case 'connected':
+                                // Server acknowledged connection
+                                break;
+                                
+                            case 'room-created':
+                                setRoomId(data.roomCode);
+                                window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+                                break;
+                                
+                            case 'player-joined':
+                                // FIXED: Server sends { type: 'player-joined', players: [...] }
+                                // Use the full players array from server instead of trying to append one
+                                if (data.players) {
+                                    setPlayers(data.players);
+                                }
+                                break;
+                                
+                            case 'player-left':
+                                // FIXED: Server sends { type: 'player-left', playerName, players: [...] }
+                                if (data.players) {
+                                    setPlayers(data.players);
+                                }
+                                break;
+                                
+                            case 'player-input':
+                                // Forward input from controllers — game can listen for this
+                                console.log('[VTX Screen] Player Input:', data.playerName, data.input);
+                                break;
+                                
+                            case 'game-started':
+                                // Confirmation that game started successfully
+                                break;
+                                
+                            case 'game-list':
+                                setAvailableGames(data.games || []);
+                                break;
+                                
+                            case 'error':
+                                console.error('[VTX Screen] Error:', data.message);
+                                break;
+                        }
+                    } catch(e) {
+                        console.error('[VTX Screen] Parse error:', e);
                     }
                 };
                 
                 socketRef.current = ws;
 
-                // Optionally, fetch games list straight away when connected
                 ws.onopen = () => {
-                    setInterval(() => {
+                    console.log('[VTX Screen] WebSocket connected');
+                    // Fetch games immediately
+                    ws.send(JSON.stringify({ type: 'get-games' }));
+                    
+                    // Poll for games periodically
+                    gamesPollerRef.current = setInterval(() => {
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify({ type: 'get-games' }));
                         }
-                    }, 5000); // Poll for newly auto-built games every 5 secs!
+                    }, 10000);
                 };
 
                 return () => {
+                    if (gamesPollerRef.current) clearInterval(gamesPollerRef.current);
                     if(ws.readyState === WebSocket.OPEN) ws.close();
                 };
             }, []);
@@ -473,26 +540,43 @@
                 }
             };
 
-            const handleStartGame = (url) => {
+            const handleStartGame = (game) => {
+                const url = game.path || game.url;
                 setGameUrl(url);
+                setCurrentGameName(game.name);
                 setGameState('playing');
                 window.start3DGame(); // Activate galaxy loader
                 
                 if (socketRef.current) {
-                    socketRef.current.send(JSON.stringify({ type: 'start-game', gameId: 'unity-demo' }));
+                    socketRef.current.send(JSON.stringify({ 
+                        type: 'start-game', 
+                        gameId: game.name || 'external-game',
+                        genre: game.genre
+                    }));
                 }
 
-                // In a real scenario, the iframe sends a message 'unity-ready'. For demo:
+                // Listen for unity-ready message from iframe
                 window.addEventListener('message', (e) => {
                     if(e.data === 'unity-ready') {
                         document.getElementById('game-container').classList.remove('active');
                     }
                 });
 
-                // Fail-safe to remove loading screen after 6 secs
+                // Auto-remove loading screen after 6 secs
                 setTimeout(() => {
                     document.getElementById('game-container').classList.remove('active');
                 }, 6000);
+            };
+
+            const handleBackToLobby = () => {
+                setGameState('lobby');
+                setGameUrl(null);
+                setCurrentGameName('');
+                document.getElementById('game-container').classList.remove('active');
+                
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({ type: 'back-to-lobby' }));
+                }
             };
 
             return (
@@ -502,13 +586,17 @@
                     
                     {/* The External Hosted 3D Iframe */}
                     {gameState === 'playing' && gameUrl && (
-                        <iframe 
-                            src={gameUrl} 
-                            className="absolute inset-0 w-full h-full border-none z-50 bg-black"
-                            id="unity-vm"
-                            allow="gamepad; autoplay; fullscreen"
-                            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                        ></iframe>
+                        <>
+                            <iframe 
+                                src={gameUrl} 
+                                id="external-game-frame"
+                                allow="gamepad; autoplay; fullscreen"
+                                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                            ></iframe>
+                            <button id="iframe-back-btn" onClick={handleBackToLobby}>
+                                ← Back to Lobby
+                            </button>
+                        </>
                     )}
                 </div>
             );

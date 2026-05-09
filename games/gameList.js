@@ -36,8 +36,10 @@ const games = [
     { id: "2048", name: "2048", genre: "Puzzle", path: "https://play2048.co/", isExternal: true }
 ];
 
-// Let's programmatically generate up to 300 fake game listings to give the library a "wow" generic appearance
-// But these will just point to working Crazygames generic embeds to prevent 404s
+const prefixes = ["Cyber", "Neon", "Dark", "Super", "Mega", "Ghost", "Alien", "Fantasy", "Space", "Void", "Iron", "Shadow", "Magic", "Lost", "Infinite", "Quantum", "Apex", "Nova", "Cosmic", "Rogue"];
+const core = ["Rider", "Shooter", "Fighter", "Runner", "Hunter", "Warrior", "Sniper", "Racer", "Driver", "Knight", "Ninja", "Zombie", "Robot", "Dragon", "Wizard", "Pirate", "Tank", "Hero", "Samurai", "Pilot"];
+const suffixes = ["3D", "X", "Pro", "Legends", "Quest", "Arena", "Clash", "Wars", "Combat", "Drift", "Dash", "Strike", "Battle", "Online", "VR"];
+
 const genericUrls = [
     "https://www.crazygames.com/embed/drift-hunters",
     "https://www.crazygames.com/embed/moto-x3m",
@@ -45,11 +47,21 @@ const genericUrls = [
     "https://www.crazygames.com/embed/subway-surfers"
 ];
 
-for(let i = 1; i <= 280; i++) {
+const generatedNames = new Set();
+while(generatedNames.size < 300) {
+    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const c = core[Math.floor(Math.random() * core.length)];
+    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
+    generatedNames.add(`${p} ${c} ${s}`);
+}
+
+const namesArray = Array.from(generatedNames);
+
+for(let i = 0; i < 300; i++) {
     games.push({
         id: `vtx-game-${i}`,
-        name: `Virtual 3D Engine Game ${i}`,
-        genre: i % 2 === 0 ? "3D Simulator" : "Action 3D",
+        name: namesArray[i],
+        genre: i % 3 === 0 ? "3D Simulator" : (i % 2 === 0 ? "Action 3D" : "Arcade"),
         path: genericUrls[i % genericUrls.length],
         isExternal: true
     });
